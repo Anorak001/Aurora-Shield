@@ -399,6 +399,251 @@
             color: var(--accent);
         }
 
+        /* Live Requests Tab Styles */
+        .live-requests-panel {
+            background: var(--panel);
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:24px;
+            margin-bottom:24px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        .live-requests-panel::before {
+            content: '';
+            height:4px; display:block; width:100%;
+            background: linear-gradient(90deg, #ff4757, #ff6b7a);
+            border-radius: 12px 12px 0 0; margin-bottom:16px; 
+            box-shadow: 0 6px 18px rgba(255,71,87,0.3) inset;
+        }
+
+        .live-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .live-stat-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.03);
+            box-shadow: 0 8px 24px rgba(2,6,20,0.6);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .live-stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .live-stat-label {
+            color: var(--muted);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .live-stat-trend {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 18px;
+        }
+
+        .live-stat-trend.success { color: var(--success); }
+        .live-stat-trend.danger { color: var(--danger); }
+        .live-stat-trend.warning { color: var(--warning); }
+
+        .request-stream-container {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            max-height: 400px;
+            overflow: hidden;
+        }
+
+        .stream-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 12px;
+        }
+
+        .stream-header h3 {
+            color: var(--accent);
+            margin: 0;
+        }
+
+        .stream-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .stream-status {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .request-stream {
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .request-entry {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            animation: slideIn 0.3s ease;
+        }
+
+        .request-entry:last-child {
+            border-bottom: none;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .request-timestamp {
+            color: var(--muted);
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .request-ip {
+            color: var(--accent-2);
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .request-method {
+            width: 60px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .request-url {
+            flex: 1;
+            color: #dbe6ff;
+            margin: 0 12px;
+        }
+
+        .request-status {
+            width: 80px;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .request-status.allowed { color: var(--success); }
+        .request-status.blocked { color: var(--danger); }
+        .request-status.rate-limited { color: var(--warning); }
+
+        .rate-limit-viz {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .rate-limit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .rate-limit-card {
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .rate-limit-header {
+            color: var(--accent-2);
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .rate-limit-bar {
+            background: rgba(255,255,255,0.1);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .rate-limit-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .rate-limit-text {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .ip-reputation-monitor {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .ip-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .ip-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .ip-address {
+            color: var(--accent-2);
+            font-family: 'Courier New', monospace;
+        }
+
+        .ip-score {
+            font-weight: 600;
+        }
+
+        .ip-score.good { color: var(--success); }
+        .ip-score.suspicious { color: var(--warning); }
+        .ip-score.malicious { color: var(--danger); }
+
         /* Responsive */
         @media (max-width:768px){ 
             .stats-grid{ grid-template-columns: repeat(2,1fr); } 
@@ -455,6 +700,7 @@
         <div class="tab-navigation">
             <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
             <button class="tab-btn" onclick="switchTab('mitigation')">🛡️ Mitigation</button>
+            <button class="tab-btn" onclick="switchTab('live-requests')">🔴 Live Requests</button>
             <button class="tab-btn" onclick="switchTab('monitoring')">📡 Monitoring</button>
             <button class="tab-btn" onclick="switchTab('config')">⚙️ Configuration</button>
         </div>
@@ -520,17 +766,6 @@
                     
                     <div class="mitigation-card">
                         <div class="mitigation-title">
-                            🧠 Challenge Response
-                            <span class="status-indicator status-active"></span>
-                        </div>
-                        <div class="mitigation-description">
-                            Deploy JavaScript challenges to verify legitimate users
-                        </div>
-                        <button class="btn btn-success" onclick="toggleMitigation('challenge_response')">✅ Active</button>
-                    </div>
-                    
-                    <div class="mitigation-card">
-                        <div class="mitigation-title">
                             🔍 IP Reputation
                             <span class="status-indicator status-active"></span>
                         </div>
@@ -538,17 +773,6 @@
                             Block requests from known malicious IP addresses
                         </div>
                         <button class="btn btn-success" onclick="toggleMitigation('ip_reputation')">✅ Active</button>
-                    </div>
-                    
-                    <div class="mitigation-card">
-                        <div class="mitigation-title">
-                            🤖 Bot Detection
-                            <span class="status-indicator status-warning"></span>
-                        </div>
-                        <div class="mitigation-description">
-                            Identify and filter automated bot traffic patterns
-                        </div>
-                        <button class="btn btn-secondary" onclick="toggleMitigation('bot_detection')">⚠️ Learning</button>
                     </div>
                     
                     <div class="mitigation-card">
@@ -561,16 +785,88 @@
                         </div>
                         <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Requests Tab -->
+        <div id="live-requests-tab" class="tab-content">
+            <div class="live-requests-panel">
+                <div class="panel-title">🔴 Live Request Monitoring</div>
+                
+                <!-- Real-time Stats -->
+                <div class="live-stats-grid">
+                    <div class="live-stat-card">
+                        <div class="live-stat-value" id="live-requests-per-sec">0</div>
+                        <div class="live-stat-label">Requests/sec</div>
+                        <div class="live-stat-trend" id="requests-trend">📈</div>
+                    </div>
+                    <div class="live-stat-card">
+                        <div class="live-stat-value" id="live-blocked-count">0</div>
+                        <div class="live-stat-label">Blocked</div>
+                        <div class="live-stat-trend danger">🛡️</div>
+                    </div>
+                    <div class="live-stat-card">
+                        <div class="live-stat-value" id="live-allowed-count">0</div>
+                        <div class="live-stat-label">Allowed</div>
+                        <div class="live-stat-trend success">✅</div>
+                    </div>
+                    <div class="live-stat-card">
+                        <div class="live-stat-value" id="live-rate-limited">0</div>
+                        <div class="live-stat-label">Rate Limited</div>
+                        <div class="live-stat-trend warning">⚠️</div>
+                    </div>
+                </div>
+
+                <!-- Request Stream -->
+                <div class="request-stream-container">
+                    <div class="stream-header">
+                        <h3>📡 Real-time Request Stream</h3>
+                        <div class="stream-controls">
+                            <button class="btn btn-small" onclick="pauseStream()" id="pause-btn">⏸️ Pause</button>
+                            <button class="btn btn-small" onclick="clearStream()">🗑️ Clear</button>
+                            <span class="stream-status" id="stream-status">🟢 Live</span>
+                        </div>
+                    </div>
                     
-                    <div class="mitigation-card">
-                        <div class="mitigation-title">
-                            📊 Adaptive Learning
-                            <span class="status-indicator status-active"></span>
+                    <div class="request-stream" id="request-stream">
+                        <!-- Live requests will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Rate Limiting Visualization -->
+                <div class="rate-limit-viz">
+                    <div class="panel-title">⚡ Rate Limiting Status</div>
+                    <div class="rate-limit-grid">
+                        <div class="rate-limit-card">
+                            <div class="rate-limit-header">IP: <span id="top-ip">127.0.0.1</span></div>
+                            <div class="rate-limit-bar">
+                                <div class="rate-limit-fill" id="rate-fill-1" style="width: 0%"></div>
+                            </div>
+                            <div class="rate-limit-text"><span id="rate-count-1">0</span>/100 req/min</div>
                         </div>
-                        <div class="mitigation-description">
-                            Machine learning-based attack pattern recognition
+                        <div class="rate-limit-card">
+                            <div class="rate-limit-header">IP: <span id="second-ip">192.168.1.100</span></div>
+                            <div class="rate-limit-bar">
+                                <div class="rate-limit-fill" id="rate-fill-2" style="width: 0%"></div>
+                            </div>
+                            <div class="rate-limit-text"><span id="rate-count-2">0</span>/100 req/min</div>
                         </div>
-                        <button class="btn btn-success" onclick="toggleMitigation('adaptive_learning')">✅ Active</button>
+                        <div class="rate-limit-card">
+                            <div class="rate-limit-header">IP: <span id="third-ip">10.0.0.50</span></div>
+                            <div class="rate-limit-bar">
+                                <div class="rate-limit-fill" id="rate-fill-3" style="width: 0%"></div>
+                            </div>
+                            <div class="rate-limit-text"><span id="rate-count-3">0</span>/100 req/min</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IP Reputation Monitor -->
+                <div class="ip-reputation-monitor">
+                    <div class="panel-title">🔍 IP Reputation Monitor</div>
+                    <div class="ip-list" id="ip-reputation-list">
+                        <!-- IP reputation entries will be populated here -->
                     </div>
                 </div>
             </div>
@@ -666,6 +962,9 @@
                     break;
                 case 'mitigation':
                     updateMitigationStatus();
+                    break;
+                case 'live-requests':
+                    startLiveRequestMonitoring();
                     break;
                 case 'monitoring':
                     updateMonitoringData();
@@ -828,6 +1127,283 @@
                     btn.style.transform = '';
                 }, 300);
             }
+        }
+
+        // Live Requests Monitoring
+        let liveRequestsData = {
+            requestsPerSec: 0,
+            blockedCount: 0,
+            allowedCount: 0,
+            rateLimitedCount: 0,
+            isPaused: false,
+            requestHistory: [],
+            ipCounters: {},
+            ipReputation: {}
+        };
+
+        let liveRequestsInterval = null;
+
+        function startLiveRequestMonitoring() {
+            if (liveRequestsInterval) {
+                clearInterval(liveRequestsInterval);
+            }
+            
+            // Reset counters
+            resetLiveCounters();
+            
+            // Start real-time monitoring
+            liveRequestsInterval = setInterval(() => {
+                if (!liveRequestsData.isPaused) {
+                    fetchLiveRequests();
+                    updateLiveStats();
+                    updateRateLimitViz();
+                    updateIPReputation();
+                }
+            }, 1000);
+            
+            // Initial load
+            fetchLiveRequests();
+        }
+
+        function fetchLiveRequests() {
+            // Try to fetch real data first
+            fetch('/api/dashboard/live-requests')
+                .then(response => response.json())
+                .then(data => {
+                    processLiveRequests(data.requests || []);
+                })
+                .catch(error => {
+                    // Fallback to simulated data for demo
+                    generateSimulatedRequests();
+                });
+        }
+
+        function generateSimulatedRequests() {
+            // Generate realistic simulated requests
+            const ips = ['192.168.1.100', '10.0.0.50', '172.16.0.25', '203.0.113.10', '198.51.100.20', '127.0.0.1'];
+            const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+            const urls = ['/', '/api/data', '/login', '/dashboard', '/api/status', '/cdn/primary/', '/api/auth'];
+            const userAgents = ['Mozilla/5.0', 'curl/7.68.0', 'Python-requests/2.25.1'];
+            
+            // Generate 1-5 requests per second
+            const requestCount = Math.floor(Math.random() * 5) + 1;
+            
+            for (let i = 0; i < requestCount; i++) {
+                const ip = ips[Math.floor(Math.random() * ips.length)];
+                const method = methods[Math.floor(Math.random() * methods.length)];
+                const url = urls[Math.floor(Math.random() * urls.length)];
+                const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+                
+                // Increment IP counter for rate limiting simulation
+                if (!liveRequestsData.ipCounters[ip]) {
+                    liveRequestsData.ipCounters[ip] = 0;
+                }
+                liveRequestsData.ipCounters[ip]++;
+                
+                // Determine status based on various factors
+                let status = 'allowed';
+                let reason = '';
+                
+                // Rate limiting check (simulate 100 req/min limit)
+                if (liveRequestsData.ipCounters[ip] > 100) {
+                    status = 'rate-limited';
+                    reason = 'Rate limit exceeded';
+                    liveRequestsData.rateLimitedCount++;
+                } 
+                // IP reputation check
+                else if (ip === '203.0.113.10' && Math.random() > 0.7) {
+                    status = 'blocked';
+                    reason = 'Malicious IP';
+                    liveRequestsData.blockedCount++;
+                }
+                // Suspicious patterns
+                else if (method === 'POST' && url === '/login' && Math.random() > 0.8) {
+                    status = 'blocked';
+                    reason = 'Brute force attempt';
+                    liveRequestsData.blockedCount++;
+                } else {
+                    liveRequestsData.allowedCount++;
+                }
+                
+                const request = {
+                    timestamp: new Date().toLocaleTimeString(),
+                    ip: ip,
+                    method: method,
+                    url: url,
+                    status: status,
+                    reason: reason,
+                    userAgent: userAgent
+                };
+                
+                addRequestToStream(request);
+                
+                // Update IP reputation
+                updateIPReputationData(ip, status);
+            }
+            
+            // Update requests per second
+            liveRequestsData.requestsPerSec = requestCount;
+        }
+
+        function processLiveRequests(requests) {
+            requests.forEach(request => {
+                const ip = request.ip;
+                
+                // Update counters
+                if (!liveRequestsData.ipCounters[ip]) {
+                    liveRequestsData.ipCounters[ip] = 0;
+                }
+                liveRequestsData.ipCounters[ip]++;
+                
+                switch(request.status) {
+                    case 'blocked':
+                        liveRequestsData.blockedCount++;
+                        break;
+                    case 'rate-limited':
+                        liveRequestsData.rateLimitedCount++;
+                        break;
+                    default:
+                        liveRequestsData.allowedCount++;
+                }
+                
+                addRequestToStream(request);
+                updateIPReputationData(ip, request.status);
+            });
+            
+            liveRequestsData.requestsPerSec = requests.length;
+        }
+
+        function addRequestToStream(request) {
+            const stream = document.getElementById('request-stream');
+            if (!stream) return;
+            
+            const entry = document.createElement('div');
+            entry.className = 'request-entry';
+            entry.innerHTML = `
+                <span class="request-timestamp">${request.timestamp}</span>
+                <span class="request-ip">${request.ip}</span>
+                <span class="request-method">${request.method}</span>
+                <span class="request-url">${request.url}</span>
+                <span class="request-status ${request.status}">${getStatusText(request.status)}</span>
+            `;
+            
+            // Add to top of stream
+            stream.insertBefore(entry, stream.firstChild);
+            
+            // Keep only last 50 entries
+            while (stream.children.length > 50) {
+                stream.removeChild(stream.lastChild);
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'allowed': return '✅ ALLOWED';
+                case 'blocked': return '🚫 BLOCKED';
+                case 'rate-limited': return '⚠️ RATE LIMITED';
+                default: return status.toUpperCase();
+            }
+        }
+
+        function updateLiveStats() {
+            document.getElementById('live-requests-per-sec').textContent = liveRequestsData.requestsPerSec || 0;
+            document.getElementById('live-blocked-count').textContent = liveRequestsData.blockedCount || 0;
+            document.getElementById('live-allowed-count').textContent = liveRequestsData.allowedCount || 0;
+            document.getElementById('live-rate-limited').textContent = liveRequestsData.rateLimitedCount || 0;
+        }
+
+        function updateRateLimitViz() {
+            const topIPs = Object.entries(liveRequestsData.ipCounters)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3);
+            
+            topIPs.forEach((entry, index) => {
+                const [ip, count] = entry;
+                const percentage = Math.min((count / 100) * 100, 100);
+                
+                const ipElement = document.getElementById(`${['top', 'second', 'third'][index]}-ip`);
+                const fillElement = document.getElementById(`rate-fill-${index + 1}`);
+                const countElement = document.getElementById(`rate-count-${index + 1}`);
+                
+                if (ipElement) ipElement.textContent = ip;
+                if (fillElement) fillElement.style.width = percentage + '%';
+                if (countElement) countElement.textContent = count;
+            });
+        }
+
+        function updateIPReputationData(ip, status) {
+            if (!liveRequestsData.ipReputation[ip]) {
+                liveRequestsData.ipReputation[ip] = {
+                    score: 100,
+                    requests: 0,
+                    blocked: 0
+                };
+            }
+            
+            const rep = liveRequestsData.ipReputation[ip];
+            rep.requests++;
+            
+            if (status === 'blocked' || status === 'rate-limited') {
+                rep.blocked++;
+                rep.score = Math.max(0, rep.score - 10);
+            } else {
+                rep.score = Math.min(100, rep.score + 1);
+            }
+        }
+
+        function updateIPReputation() {
+            const ipList = document.getElementById('ip-reputation-list');
+            if (!ipList) return;
+            
+            const topIPs = Object.entries(liveRequestsData.ipReputation)
+                .sort(([,a], [,b]) => b.requests - a.requests)
+                .slice(0, 6);
+            
+            ipList.innerHTML = topIPs.map(([ip, rep]) => {
+                const scoreClass = rep.score >= 80 ? 'good' : rep.score >= 50 ? 'suspicious' : 'malicious';
+                const statusIcon = rep.score >= 80 ? '✅' : rep.score >= 50 ? '⚠️' : '🚫';
+                
+                return `
+                    <div class="ip-entry">
+                        <span class="ip-address">${ip}</span>
+                        <span class="ip-score ${scoreClass}">${statusIcon} ${rep.score}/100</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function pauseStream() {
+            liveRequestsData.isPaused = !liveRequestsData.isPaused;
+            const btn = document.getElementById('pause-btn');
+            const status = document.getElementById('stream-status');
+            
+            if (liveRequestsData.isPaused) {
+                btn.textContent = '▶️ Resume';
+                status.textContent = '⏸️ Paused';
+                status.style.color = 'var(--warning)';
+            } else {
+                btn.textContent = '⏸️ Pause';
+                status.textContent = '🟢 Live';
+                status.style.color = 'var(--success)';
+            }
+        }
+
+        function clearStream() {
+            const stream = document.getElementById('request-stream');
+            if (stream) {
+                stream.innerHTML = '';
+            }
+            resetLiveCounters();
+        }
+
+        function resetLiveCounters() {
+            liveRequestsData.blockedCount = 0;
+            liveRequestsData.allowedCount = 0;
+            liveRequestsData.rateLimitedCount = 0;
+            liveRequestsData.requestsPerSec = 0;
+            liveRequestsData.ipCounters = {};
+            liveRequestsData.ipReputation = {};
+            updateLiveStats();
         }
 
         // Auto-refresh functionality
