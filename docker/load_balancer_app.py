@@ -95,8 +95,41 @@ def health():
 @app.route('/cdn/')
 @app.route('/cdn')
 def load_balanced():
-    """Load balanced CDN access."""
+    """Load balanced CDN access with Aurora Shield protection."""
+    logger.info("=== CDN REQUEST RECEIVED ===")
     stats['requests_total'] += 1
+    
+    # Check with Aurora Shield first
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', '')
+    logger.info(f"Processing CDN request from IP: {client_ip}")
+    
+    try:
+        # Send request to Aurora Shield for authorization
+        logger.info(f"Checking request with Aurora Shield for IP: {client_ip}")
+        shield_response = requests.post(
+            'http://aurora-shield:8080/api/shield/check-request',
+            headers={
+                'X-Original-IP': client_ip,
+                'X-Original-URI': '/cdn/',
+                'User-Agent': user_agent
+            },
+            timeout=2
+        )
+        
+        logger.info(f"Aurora Shield response: {shield_response.status_code}")
+        
+        # If Aurora Shield blocks the request
+        if shield_response.status_code == 403:
+            logger.warning(f"Request blocked by Aurora Shield from {client_ip}")
+            return jsonify({
+                'error': 'Request blocked by Aurora Shield',
+                'reason': 'Security policy violation'
+            }), 403
+            
+    except requests.RequestException as e:
+        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
+        # If Aurora Shield is unreachable, log but allow the request
     
     selected_cdn = get_weighted_cdn()
     if not selected_cdn:
@@ -114,7 +147,7 @@ def load_balanced():
         if response.headers.get('content-type', '').startswith('text/html'):
             response_data = response_data.replace(
                 '<body>',
-                f'<body><div style="background:#3498db;color:white;padding:10px;text-align:center;">🔀 Served by {selected_cdn.title()} CDN via Load Balancer</div>'
+                f'<body><div style="background:#3498db;color:white;padding:10px;text-align:center;">🔀 Served by {selected_cdn.title()} CDN via Load Balancer (Protected by Aurora Shield)</div>'
             )
         
         return response_data, response.status_code
@@ -129,12 +162,40 @@ def load_balanced():
 @app.route('/cdn/<cdn_name>/')
 @app.route('/cdn/<cdn_name>')
 def direct_cdn(cdn_name):
-    """Direct CDN access."""
+    """Direct CDN access with Aurora Shield protection."""
     stats['requests_total'] += 1
     
     if cdn_name not in CDN_SERVICES:
         stats['errors'] += 1
         return jsonify({'error': f'CDN {cdn_name} not found'}), 404
+    
+    # Check with Aurora Shield first
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', '')
+    
+    try:
+        # Send request to Aurora Shield for authorization
+        shield_response = requests.post(
+            'http://aurora-shield:8080/api/shield/check-request',
+            headers={
+                'X-Original-IP': client_ip,
+                'X-Original-URI': f'/cdn/{cdn_name}/',
+                'User-Agent': user_agent
+            },
+            timeout=2
+        )
+        
+        # If Aurora Shield blocks the request
+        if shield_response.status_code == 403:
+            logger.warning(f"Request blocked by Aurora Shield from {client_ip} for {cdn_name}")
+            return jsonify({
+                'error': 'Request blocked by Aurora Shield',
+                'reason': 'Security policy violation'
+            }), 403
+            
+    except requests.RequestException as e:
+        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
+        # If Aurora Shield is unreachable, log but allow the request
     
     stats['requests_by_cdn'][cdn_name] += 1
     

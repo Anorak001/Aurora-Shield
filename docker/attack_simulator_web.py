@@ -25,7 +25,7 @@ class AttackSimulator:
         self.target_host = os.getenv('TARGET_HOST', 'aurora-shield')
         self.target_port = os.getenv('TARGET_PORT', '8080')
         self.lb_host = os.getenv('LB_HOST', 'load-balancer')
-        self.lb_port = os.getenv('LB_PORT', '80')
+        self.lb_port = os.getenv('LB_PORT', '8090')
         
         self.aurora_url = f"http://{self.target_host}:{self.target_port}"
         self.lb_url = f"http://{self.lb_host}:{self.lb_port}"
@@ -78,6 +78,14 @@ class AttackSimulator:
             
             url = self.aurora_url if target == 'aurora' else self.lb_url
             
+            # Use CDN endpoints for load balancer to trigger Aurora Shield
+            if target == 'load_balancer':
+                endpoints = ['/cdn/', '/cdn/primary/', '/cdn/secondary/']
+            elif target == 'aurora':
+                endpoints = ['/api/shield/check-request']
+            else:
+                endpoints = ['/']
+            
             start_time = time.time()
             request_count = 0
             
@@ -92,7 +100,19 @@ class AttackSimulator:
                         break
                     
                     try:
-                        response = requests.get(f"{url}/", timeout=2)
+                        endpoint = random.choice(endpoints)
+                        
+                        # Use POST for Aurora Shield authorization endpoint
+                        if target == 'aurora' and endpoint == '/api/shield/check-request':
+                            headers = {
+                                'X-Original-IP': f'192.168.1.{random.randint(1, 254)}',
+                                'X-Original-URI': f'/attack/{random.randint(1, 1000)}',
+                                'User-Agent': f'AttackBot/{random.randint(1, 10)}'
+                            }
+                            response = requests.post(f"{url}{endpoint}", headers=headers, timeout=2)
+                        else:
+                            response = requests.get(f"{url}{endpoint}", timeout=2)
+                        
                         request_count += 1
                         
                         # Check if request was blocked by Aurora Shield
@@ -178,7 +198,15 @@ class AttackSimulator:
             
             url = self.aurora_url if target == 'aurora' else self.lb_url
             
-            endpoints = ['/', '/health', '/api/status']
+            # Target endpoints that go through Aurora Shield protection
+            if target == 'load_balancer':
+                endpoints = ['/cdn/', '/cdn/primary/', '/cdn/secondary/', '/cdn/tertiary/']
+            elif target == 'aurora':
+                # Target Aurora Shield authorization endpoint to trigger request processing
+                endpoints = ['/api/shield/check-request']
+            else:
+                endpoints = ['/', '/health', '/api/status']
+            
             user_agents = [
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -197,8 +225,18 @@ class AttackSimulator:
                     endpoint = random.choice(endpoints)
                     headers = {'User-Agent': random.choice(user_agents)}
                     
-                    response = requests.get(f"{url}{endpoint}", 
-                                          headers=headers, timeout=5)
+                    # Use POST for Aurora Shield authorization endpoint
+                    if target == 'aurora' and endpoint == '/api/shield/check-request':
+                        headers.update({
+                            'X-Original-IP': f'192.168.1.{random.randint(1, 254)}',
+                            'X-Original-URI': f'/test/{random.randint(1, 1000)}'
+                        })
+                        response = requests.post(f"{url}{endpoint}", 
+                                              headers=headers, timeout=5)
+                    else:
+                        response = requests.get(f"{url}{endpoint}", 
+                                              headers=headers, timeout=5)
+                    
                     request_count += 1
                     
                     blocked = 'blocked' in response.text.lower() or response.status_code == 429
