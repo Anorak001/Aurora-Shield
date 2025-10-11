@@ -99,16 +99,6 @@ def get_next_cdn_roundrobin():
     
     return cdn_name
 
-@app.route('/')
-def home():
-    """Load balancer status page."""
-    uptime = datetime.now() - stats['start_time']
-    
-    return render_template('load_balancer.html', 
-                         cdns=CDN_SERVICES, 
-                         stats=stats, 
-                         uptime=str(uptime).split('.')[0])
-
 @app.route('/health')
 def health():
     """Health check endpoint."""
@@ -291,9 +281,19 @@ def enhanced_dashboard():
     """Enhanced load balancer dashboard with real-time monitoring."""
     return render_template('load_balancer_enhanced.html')
 
+@app.route('/legacy')
+def legacy_dashboard():
+    """Legacy load balancer status page."""
+    uptime = datetime.now() - stats['start_time']
+    
+    return render_template('load_balancer.html', 
+                         cdns=CDN_SERVICES, 
+                         stats=stats, 
+                         uptime=str(uptime).split('.')[0])
+
 @app.route('/')
 def index():
-    """Redirect to enhanced dashboard."""
+    """Redirect to enhanced dashboard with round-robin visualization."""
     return redirect('/dashboard')
 
 @app.route('/api/cdn/health')
