@@ -103,6 +103,8 @@ services:
       - FLASK_ENV=production
       - CLIENT_ID=1
       - CLIENT_NAME=Attack Simulator 1
+      - LB_HOST=load-balancer
+      - LB_PORT=8090
     volumes:
       - ./logs:/app/logs
     networks:
@@ -122,6 +124,8 @@ services:
       - FLASK_ENV=production
       - CLIENT_ID=2
       - CLIENT_NAME=Attack Simulator 2
+      - LB_HOST=load-balancer
+      - LB_PORT=8090
     volumes:
       - ./logs:/app/logs
     networks:
@@ -141,6 +145,8 @@ services:
       - FLASK_ENV=production
       - CLIENT_ID=3
       - CLIENT_NAME=Attack Simulator 3
+      - LB_HOST=load-balancer
+      - LB_PORT=8090
     volumes:
       - ./logs:/app/logs
     networks:
