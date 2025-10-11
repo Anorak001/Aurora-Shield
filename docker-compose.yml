@@ -28,10 +28,13 @@ services:
     container_name: as_load-balancer
     ports:
       - "8090:8090"
+    user: root
     environment:
       - FLASK_ENV=production
+      - ENABLE_REAL_DOCKER=true
     volumes:
       - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - aurora-net
     depends_on:
@@ -39,6 +42,7 @@ services:
       - demo-webapp-cdn2
       - demo-webapp-cdn3
     restart: unless-stopped
+    privileged: true
 
   # Primary CDN Service
   demo-webapp:

@@ -3,16 +3,19 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Docker CLI and docker-compose
 RUN apt-get update && apt-get install -y \
     curl \
+    docker.io \
+    docker-compose \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip install flask requests gunicorn
+# Install Python dependencies including Docker SDK
+RUN pip install flask requests gunicorn docker
 
-# Create non-root user
-RUN useradd -m -u 1000 loadbalancer
+# Create non-root user and add to docker group for Docker socket access
+RUN useradd -m -u 1000 loadbalancer && \
+    usermod -aG docker loadbalancer
 
 # Copy load balancer application
 COPY docker/load_balancer_app.py /app/app.py
