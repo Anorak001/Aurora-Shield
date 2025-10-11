@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aurora Shield - Enhanced Attack Orchestrator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -242,6 +243,85 @@
             100% { opacity: 1; }
         }
 
+        /* Tab Navigation Styles */
+        .tab-navigation {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: rgba(20,24,40,0.4);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(155, 124, 255, 0.3);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.05);
+            color: var(--accent-2);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* Analytics Styles */
+        .analytics-panel {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border-radius: 14px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .analytics-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .chart-container {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255,255,255,0.03);
+            box-shadow: 0 8px 24px rgba(2,6,20,0.6);
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+            height: auto !important;
+            background: rgba(11, 18, 32, 0.3);
+            border-radius: 8px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .subnet-info {
             font-size: 10px;
             color: var(--muted);
@@ -270,8 +350,16 @@
             <p>Virtual IP Management • Multi-Subnet Attacks • Real-time Control</p>
         </div>
 
-        <!-- Statistics Overview -->
-        <div class="stats-grid">
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" onclick="switchTab('control')">🎮 Bot Control</button>
+            <button class="tab-btn" onclick="switchTab('analytics')">📊 Analytics</button>
+        </div>
+
+        <!-- Bot Control Tab -->
+        <div id="control-tab" class="tab-content active">
+            <!-- Statistics Overview -->
+            <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="totalBots">0</div>
                 <div class="stat-label">Total Bots</div>
@@ -305,14 +393,22 @@
             <div class="controls-grid">
                 <button class="btn btn-success" onclick="startAllBots()">▶️ Start All</button>
                 <button class="btn btn-danger" onclick="stopAllBots()">⏹️ Stop All</button>
-                <button class="btn btn-primary" onclick="createRandomBot()">🤖 Create Random Bot</button>
+                <button class="btn btn-danger" onclick="deleteAllBots()">🗑️ Delete All Bots</button>
+                <button class="btn btn-primary" onclick="createRandomBotsPrompt()">🤖 Create Random Bots</button>
                 <button class="btn btn-warning" onclick="toggleCreateForm()">⚙️ Custom Bot</button>
                 <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
-                <button class="btn btn-primary" onclick="exportLogs()">📊 Export Logs</button>
+                <button class="btn btn-info" onclick="switchTab('analytics')">📊 Analytics</button>
             </div>
 
             <!-- Create Bot Form -->
             <div id="createBotForm" class="create-bot-form" style="display: none;">
+                <h4 style="color: var(--accent); margin-bottom: 16px; grid-column: span 2;">🔧 Custom Bot Configuration</h4>
+                
+                <div class="form-group">
+                    <label>Number of Bots</label>
+                    <input type="number" id="botCount" min="1" max="100" value="1" placeholder="How many bots to create">
+                </div>
+                
                 <div class="form-group">
                     <label>Attack Type</label>
                     <select id="attackType">
@@ -321,30 +417,55 @@
                         <option value="slowloris">Slowloris</option>
                         <option value="brute_force">Brute Force</option>
                         <option value="resource_exhaustion">Resource Exhaustion</option>
+                        <option value="syn_flood">SYN Flood</option>
+                        <option value="udp_flood">UDP Flood</option>
                     </select>
                 </div>
+                
                 <div class="form-group">
                     <label>Rate (req/sec)</label>
-                    <input type="number" id="customRate" min="0.1" max="1000" step="0.1" value="10">
+                    <input type="number" id="customRate" min="0.1" max="1000" step="0.1" value="10" placeholder="Requests per second">
                 </div>
+                
                 <div class="form-group">
                     <label>Duration (seconds)</label>
-                    <input type="number" id="customDuration" min="10" max="3600" value="60">
+                    <input type="number" id="customDuration" min="10" max="3600" value="60" placeholder="Attack duration">
                 </div>
+                
+                <div class="form-group">
+                    <label>Target URL</label>
+                    <input type="text" id="customTarget" value="http://localhost:8080" placeholder="Full target URL">
+                </div>
+                
                 <div class="form-group">
                     <label>Target Path</label>
                     <input type="text" id="customPath" value="/api/test" placeholder="/api/endpoint">
                 </div>
+                
                 <div class="form-group">
                     <label>User Agent</label>
                     <input type="text" id="customUserAgent" value="CustomBot/1.0" placeholder="Bot User Agent">
                 </div>
+                
                 <div class="form-group">
                     <label>Payload Size (bytes)</label>
-                    <input type="number" id="customPayload" min="0" max="50000" value="1000">
+                    <input type="number" id="customPayload" min="0" max="50000" value="1000" placeholder="Request payload size">
                 </div>
+                
+                <div class="form-group">
+                    <label>Concurrent Connections</label>
+                    <input type="number" id="customConnections" min="1" max="1000" value="10" placeholder="Concurrent connections">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="randomizeHeaders"> Randomize Headers
+                    </label>
+                </div>
+                
                 <div class="form-group" style="grid-column: span 2;">
-                    <button class="btn btn-success" onclick="createCustomBot()">🚀 Create Custom Bot</button>
+                    <button class="btn btn-success" onclick="createCustomBots()">🚀 Create Custom Bots</button>
+                    <button class="btn btn-secondary" onclick="resetForm()">🔄 Reset Form</button>
                 </div>
             </div>
         </div>
@@ -376,6 +497,58 @@
         <div class="auto-refresh">
             <span class="refresh-dot"></span>
             Auto-refreshing bot status every 3 seconds
+        </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics-tab" class="tab-content">
+            <div class="analytics-panel">
+                <h3 style="color: var(--accent); margin-bottom: 16px;">📊 Real-time Analytics</h3>
+                
+                <!-- Analytics Stats Grid -->
+                <div class="analytics-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalRequestsAnalytics">0</div>
+                        <div class="stat-label">Total Requests</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="requestsPerSecond">0</div>
+                        <div class="stat-label">Requests/Second</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgResponseTime">0ms</div>
+                        <div class="stat-label">Avg Response Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="errorRate">0%</div>
+                        <div class="stat-label">Error Rate</div>
+                    </div>
+                </div>
+
+                <!-- Request Types Chart -->
+                <div class="chart-container">
+                    <h4 style="color: var(--accent-2); margin-bottom: 12px;">Request Types Distribution</h4>
+                    <canvas id="requestTypesChart" width="800" height="400"></canvas>
+                </div>
+
+                <!-- Response Status Chart -->
+                <div class="chart-container">
+                    <h4 style="color: var(--accent-2); margin-bottom: 12px;">Response Status Codes</h4>
+                    <canvas id="statusCodesChart" width="800" height="400"></canvas>
+                </div>
+
+                <!-- Real-time Request Timeline -->
+                <div class="chart-container">
+                    <h4 style="color: var(--accent-2); margin-bottom: 12px;">Real-time Request Timeline</h4>
+                    <canvas id="timelineChart" width="800" height="300"></canvas>
+                </div>
+
+                <!-- Attack Types Pie Chart -->
+                <div class="chart-container">
+                    <h4 style="color: var(--accent-2); margin-bottom: 12px;">Attack Types Distribution</h4>
+                    <canvas id="attackTypesChart" width="400" height="400"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -628,6 +801,315 @@
             a.download = `attack_orchestrator_logs_${new Date().toISOString().slice(0, 10)}.json`;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        // Enhanced Bot Management Functions
+        function createRandomBotsPrompt() {
+            const count = prompt('How many random bots would you like to create?', '5');
+            if (count && !isNaN(count) && parseInt(count) > 0) {
+                createMultipleRandomBots(parseInt(count));
+            }
+        }
+
+        function createMultipleRandomBots(count) {
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => createRandomBot(), i * 200); // Stagger creation
+            }
+        }
+
+        function deleteAllBots() {
+            if (confirm('Are you sure you want to delete ALL bots? This action cannot be undone.')) {
+                fetch('/api/bots/delete-all', {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('All bots deleted successfully');
+                        refreshData();
+                    } else {
+                        alert('Error deleting bots: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Network error occurred');
+                });
+            }
+        }
+
+        function createCustomBots() {
+            const count = parseInt(document.getElementById('botCount').value) || 1;
+            const attackType = document.getElementById('attackType').value;
+            const rate = parseFloat(document.getElementById('customRate').value);
+            const duration = parseInt(document.getElementById('customDuration').value);
+            const target = document.getElementById('customTarget').value;
+            const path = document.getElementById('customPath').value;
+            const userAgent = document.getElementById('customUserAgent').value;
+            const payload = parseInt(document.getElementById('customPayload').value);
+            const connections = parseInt(document.getElementById('customConnections').value);
+            const randomizeHeaders = document.getElementById('randomizeHeaders').checked;
+
+            const botConfig = {
+                attack_type: attackType,
+                rate: rate,
+                duration: duration,
+                target: target,
+                path: path,
+                user_agent: userAgent,
+                payload_size: payload,
+                concurrent_connections: connections,
+                randomize_headers: randomizeHeaders
+            };
+
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    fetch('/api/bots/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(botConfig)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log(`Bot ${i + 1}/${count} created successfully`);
+                        } else {
+                            console.error(`Error creating bot ${i + 1}:`, data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Network error creating bot ${i + 1}:`, error);
+                    });
+                }, i * 300); // Stagger creation
+            }
+
+            alert(`Creating ${count} custom bot(s)...`);
+            toggleCreateForm(); // Hide form
+            setTimeout(refreshData, count * 300 + 1000); // Refresh after all bots are created
+        }
+
+        function resetForm() {
+            document.getElementById('botCount').value = '1';
+            document.getElementById('attackType').value = 'http_flood';
+            document.getElementById('customRate').value = '10';
+            document.getElementById('customDuration').value = '60';
+            document.getElementById('customTarget').value = 'http://localhost:8080';
+            document.getElementById('customPath').value = '/api/test';
+            document.getElementById('customUserAgent').value = 'CustomBot/1.0';
+            document.getElementById('customPayload').value = '1000';
+            document.getElementById('customConnections').value = '10';
+            document.getElementById('randomizeHeaders').checked = false;
+        }
+
+        // Tab Management
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // Initialize analytics if switching to analytics tab
+            if (tabName === 'analytics') {
+                initializeAnalytics();
+            }
+        }
+
+        // Analytics Functions
+        let charts = {};
+        let analyticsData = {
+            requestTypes: {},
+            statusCodes: {},
+            timeline: [],
+            attackTypes: {}
+        };
+
+        function initializeAnalytics() {
+            if (!charts.requestTypes) {
+                initializeCharts();
+            }
+            updateAnalyticsData();
+        }
+
+        function initializeCharts() {
+            // Request Types Chart
+            const ctx1 = document.getElementById('requestTypesChart').getContext('2d');
+            charts.requestTypes = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Request Count',
+                        data: [],
+                        backgroundColor: 'rgba(155, 124, 255, 0.6)',
+                        borderColor: 'rgba(155, 124, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#dbe6ff' } }
+                    }
+                }
+            });
+
+            // Status Codes Chart
+            const ctx2 = document.getElementById('statusCodesChart').getContext('2d');
+            charts.statusCodes = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            'rgba(0, 255, 136, 0.6)',
+                            'rgba(255, 165, 2, 0.6)',
+                            'rgba(255, 71, 87, 0.6)',
+                            'rgba(126, 224, 246, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#dbe6ff' } }
+                    }
+                }
+            });
+
+            // Timeline Chart
+            const ctx3 = document.getElementById('timelineChart').getContext('2d');
+            charts.timeline = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Requests per Minute',
+                        data: [],
+                        borderColor: 'rgba(126, 224, 246, 1)',
+                        backgroundColor: 'rgba(126, 224, 246, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#dbe6ff' } }
+                    }
+                }
+            });
+
+            // Attack Types Chart
+            const ctx4 = document.getElementById('attackTypesChart').getContext('2d');
+            charts.attackTypes = new Chart(ctx4, {
+                type: 'pie',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            'rgba(155, 124, 255, 0.6)',
+                            'rgba(126, 224, 246, 0.6)',
+                            'rgba(255, 165, 2, 0.6)',
+                            'rgba(255, 71, 87, 0.6)',
+                            'rgba(0, 255, 136, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#dbe6ff' } }
+                    }
+                }
+            });
+        }
+
+        function updateAnalyticsData() {
+            fetch('/api/analytics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateAnalyticsStats(data.analytics);
+                        updateCharts(data.analytics);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching analytics:', error);
+                });
+        }
+
+        function updateAnalyticsStats(analytics) {
+            document.getElementById('totalRequestsAnalytics').textContent = analytics.total_requests.toLocaleString();
+            document.getElementById('requestsPerSecond').textContent = analytics.requests_per_second.toFixed(1);
+            document.getElementById('avgResponseTime').textContent = analytics.avg_response_time + 'ms';
+            document.getElementById('errorRate').textContent = analytics.error_rate.toFixed(1) + '%';
+        }
+
+        function updateCharts(analytics) {
+            // Update Request Types Chart
+            if (charts.requestTypes) {
+                charts.requestTypes.data.labels = Object.keys(analytics.request_types);
+                charts.requestTypes.data.datasets[0].data = Object.values(analytics.request_types);
+                charts.requestTypes.update();
+            }
+
+            // Update Status Codes Chart
+            if (charts.statusCodes) {
+                charts.statusCodes.data.labels = Object.keys(analytics.status_codes);
+                charts.statusCodes.data.datasets[0].data = Object.values(analytics.status_codes);
+                charts.statusCodes.update();
+            }
+
+            // Update Timeline Chart
+            if (charts.timeline && analytics.timeline) {
+                charts.timeline.data.labels = analytics.timeline.map(point => point.time);
+                charts.timeline.data.datasets[0].data = analytics.timeline.map(point => point.requests);
+                charts.timeline.update();
+            }
+
+            // Update Attack Types Chart
+            if (charts.attackTypes) {
+                charts.attackTypes.data.labels = Object.keys(analytics.attack_types);
+                charts.attackTypes.data.datasets[0].data = Object.values(analytics.attack_types);
+                charts.attackTypes.update();
+            }
+        }
+
+        // Enhanced refresh to update analytics
+        function refreshData() {
+            fetch('/api/bots')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        botsData = data.bots;
+                        updateStatistics(data.stats);
+                        updateBotsTable();
+                        
+                        // Update analytics if on analytics tab
+                        if (document.getElementById('analytics-tab').classList.contains('active')) {
+                            updateAnalyticsData();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching bots:', error);
+                });
         }
     </script>
 </body>

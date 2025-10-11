@@ -71,7 +71,7 @@ class VirtualBotManager:
     def __init__(self):
         self.bots: Dict[str, VirtualBot] = {}
         self.active_threads: Dict[str, threading.Thread] = {}
-        self.target_host = "aurora-shield:8080"  # Default target
+        self.target_host = "load-balancer:8090"  # Target load balancer which routes through Aurora Shield
         self.attack_templates = {
             'http_flood': {
                 'rate_range': (10, 100),
@@ -395,7 +395,45 @@ def create_bot():
     data = request.get_json() or {}
     
     attack_type = data.get('attack_type')
-    custom_config = data.get('config', {})
+    
+    # Build custom config from form data
+    custom_config = {}
+    
+    # Rate configuration
+    if 'rate' in data:
+        custom_config['rate'] = float(data['rate'])
+    
+    # Duration configuration
+    if 'duration' in data:
+        custom_config['attack_duration'] = int(data['duration'])
+    
+    # Target configuration
+    if 'target' in data:
+        custom_config['target_url'] = data['target']
+    
+    # Path configuration
+    if 'path' in data:
+        custom_config['target_path'] = data['path']
+    
+    # User agent configuration
+    if 'user_agent' in data:
+        custom_config['user_agent'] = data['user_agent']
+    
+    # Payload size configuration
+    if 'payload_size' in data:
+        custom_config['payload_size'] = int(data['payload_size'])
+    
+    # Concurrent connections configuration
+    if 'concurrent_connections' in data:
+        custom_config['concurrent_connections'] = int(data['concurrent_connections'])
+    
+    # Headers randomization
+    if 'randomize_headers' in data:
+        custom_config['randomize_headers'] = bool(data['randomize_headers'])
+    
+    # Add any other custom config
+    if 'config' in data:
+        custom_config.update(data['config'])
     
     try:
         bot = bot_manager.create_virtual_bot(attack_type, custom_config)
@@ -523,6 +561,109 @@ def get_attack_types():
         'attack_types': list(bot_manager.attack_templates.keys()),
         'templates': bot_manager.attack_templates
     })
+
+@app.route('/api/bots/delete-all', methods=['DELETE'])
+def delete_all_bots():
+    """Delete all bots"""
+    try:
+        # Stop all active threads
+        for thread in bot_manager.active_threads.values():
+            if thread.is_alive():
+                thread.join(timeout=1)
+        
+        # Clear all bots and threads
+        bot_manager.bots.clear()
+        bot_manager.active_threads.clear()
+        
+        logger.info("🗑️ All virtual bots deleted")
+        return jsonify({
+            'success': True,
+            'message': 'All bots deleted successfully',
+            'timestamp': time.time()
+        })
+    except Exception as e:
+        logger.error(f"Error deleting all bots: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'timestamp': time.time()
+        }), 500
+
+@app.route('/api/analytics')
+def get_analytics():
+    """Get analytics data for dashboard"""
+    try:
+        # Calculate analytics from current bot data
+        total_requests = sum(bot.total_requests for bot in bot_manager.bots.values())
+        total_successful = sum(bot.successful_requests for bot in bot_manager.bots.values())
+        total_blocked = sum(bot.blocked_requests for bot in bot_manager.bots.values())
+        
+        # Request types distribution
+        request_types = {}
+        for bot in bot_manager.bots.values():
+            if bot.attack_type in request_types:
+                request_types[bot.attack_type] += bot.total_requests
+            else:
+                request_types[bot.attack_type] = bot.total_requests
+        
+        # Status codes (simulated based on success/block rates)
+        status_codes = {
+            '200': total_successful,
+            '403': total_blocked,
+            '429': int(total_blocked * 0.3),  # Rate limited
+            '500': int(total_requests * 0.05)  # Server errors
+        }
+        
+        # Attack types distribution
+        attack_types = {}
+        for bot in bot_manager.bots.values():
+            if bot.attack_type in attack_types:
+                attack_types[bot.attack_type] += 1
+            else:
+                attack_types[bot.attack_type] = 1
+        
+        # Timeline data (simulated - last 10 minutes)
+        timeline = []
+        current_time = time.time()
+        for i in range(10):
+            minute_ago = current_time - (i * 60)
+            timestamp = datetime.fromtimestamp(minute_ago).strftime('%H:%M')
+            requests_per_minute = random.randint(50, 200) if bot_manager.bots else 0
+            timeline.append({
+                'time': timestamp,
+                'requests': requests_per_minute
+            })
+        timeline.reverse()
+        
+        # Calculate rates
+        error_rate = (total_blocked / total_requests * 100) if total_requests > 0 else 0
+        active_bots = len([b for b in bot_manager.bots.values() if b.status == 'active'])
+        requests_per_second = sum(bot.rate for bot in bot_manager.bots.values() if bot.status == 'active')
+        
+        analytics = {
+            'total_requests': total_requests,
+            'requests_per_second': requests_per_second,
+            'avg_response_time': random.randint(50, 300),  # Simulated
+            'error_rate': error_rate,
+            'request_types': request_types,
+            'status_codes': status_codes,
+            'timeline': timeline,
+            'attack_types': attack_types,
+            'active_bots': active_bots
+        }
+        
+        return jsonify({
+            'success': True,
+            'analytics': analytics,
+            'timestamp': time.time()
+        })
+    except Exception as e:
+        logger.error(f"Error generating analytics: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'timestamp': time.time()
+        }), 500
 
 @app.route('/health')
 def health_check():

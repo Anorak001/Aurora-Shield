@@ -629,15 +629,29 @@
             background: rgba(255,255,255,0.02);
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.05);
+            gap: 12px;
         }
 
         .ip-address {
             color: var(--accent-2);
             font-family: 'Courier New', monospace;
+            flex: 1;
         }
 
         .ip-score {
             font-weight: 600;
+            flex: 0 0 auto;
+        }
+
+        .ip-requests {
+            color: var(--muted);
+            font-size: 12px;
+            flex: 0 0 auto;
+        }
+
+        .ip-blocked {
+            font-size: 11px;
+            flex: 0 0 auto;
         }
 
         .ip-score.good { color: var(--success); }
@@ -1254,6 +1268,17 @@
                     
                     // Update attack log
                     updateAttackLog(data.recent_attacks || []);
+                    
+                    // Update rate limiting visualization with real IPs
+                    updateRateLimitingDisplay(data.performance_metrics?.ip_request_counts || {});
+                    
+                    // Update IP reputation with backend data
+                    updateIPReputationFromBackend(data.performance_metrics?.ip_reputation_data || {});
+                    
+                    // Process real-time request data if available
+                    if (data.recent_requests && data.recent_requests.length > 0) {
+                        processLiveRequests(data.recent_requests);
+                    }
                 })
                 .catch(error => {
                     console.error('Error fetching stats:', error);
@@ -1553,11 +1578,25 @@
                 stream.innerHTML = '';
             }
             
+            // Reset counters for fresh data
+            liveRequestsData.ipReputation = {};
+            liveRequestsData.ipCounters = {};
+            
             requests.forEach(request => {
                 // Process real request data
                 addRequestToStream(request);
                 updateIPReputationData(request.ip, request.status);
+                
+                // Update IP counters for rate limiting display
+                if (!liveRequestsData.ipCounters[request.ip]) {
+                    liveRequestsData.ipCounters[request.ip] = 0;
+                }
+                liveRequestsData.ipCounters[request.ip]++;
             });
+            
+            // Update displays with new data
+            updateIPReputation();
+            updateRateLimitingDisplay(liveRequestsData.ipCounters);
         }
 
         function addRequestToStream(request) {
@@ -1666,6 +1705,81 @@
                     <div class="ip-entry">
                         <span class="ip-address">${ip}</span>
                         <span class="ip-score ${scoreClass}">${statusIcon} ${rep.score}/100</span>
+                        <span class="ip-requests">${rep.requests} req</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateRateLimitingDisplay(ipRequestCounts) {
+            // Get top attacking IPs by request count
+            const topIPs = Object.entries(ipRequestCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3);
+            
+            // Update each rate limiting card with real data
+            for (let i = 0; i < 3; i++) {
+                const ipElement = document.getElementById(i === 0 ? 'top-ip' : i === 1 ? 'second-ip' : 'third-ip');
+                const countElement = document.getElementById(`rate-count-${i + 1}`);
+                const fillElement = document.getElementById(`rate-fill-${i + 1}`);
+                
+                if (topIPs[i]) {
+                    const [ip, count] = topIPs[i];
+                    const percentage = Math.min((count / 100) * 100, 100); // Assuming 100 req/min limit
+                    
+                    if (ipElement) ipElement.textContent = ip;
+                    if (countElement) countElement.textContent = count;
+                    if (fillElement) {
+                        fillElement.style.width = `${percentage}%`;
+                        // Color coding based on rate limit threshold
+                        if (percentage >= 90) {
+                            fillElement.style.background = 'var(--danger)';
+                        } else if (percentage >= 70) {
+                            fillElement.style.background = 'var(--warning)';
+                        } else {
+                            fillElement.style.background = 'var(--success)';
+                        }
+                    }
+                } else {
+                    // No data for this slot, show placeholder
+                    if (ipElement) ipElement.textContent = '---';
+                    if (countElement) countElement.textContent = '0';
+                    if (fillElement) {
+                        fillElement.style.width = '0%';
+                        fillElement.style.background = 'var(--muted)';
+                    }
+                }
+            }
+        }
+
+        function updateIPReputationFromBackend(ipReputationData) {
+            const ipList = document.getElementById('ip-reputation-list');
+            if (!ipList) return;
+            
+            // Convert backend data to sorted list
+            const topIPs = Object.entries(ipReputationData)
+                .sort(([,a], [,b]) => b.total_requests - a.total_requests)
+                .slice(0, 8); // Show top 8 IPs
+            
+            if (topIPs.length === 0) {
+                ipList.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px;">No IP activity detected</div>';
+                return;
+            }
+            
+            ipList.innerHTML = topIPs.map(([ip, data]) => {
+                const score = Math.round(data.reputation_score);
+                const scoreClass = score >= 80 ? 'good' : score >= 50 ? 'suspicious' : 'malicious';
+                const statusIcon = score >= 80 ? '✅' : score >= 50 ? '⚠️' : '🚫';
+                const blockedPercent = Math.round((data.blocked_requests / data.total_requests) * 100);
+                
+                return `
+                    <div class="ip-entry">
+                        <span class="ip-address">${ip}</span>
+                        <span class="ip-score ${scoreClass}">${statusIcon} ${score}/100</span>
+                        <span class="ip-requests">${data.total_requests} req</span>
+                        <span class="ip-blocked" style="color: ${data.blocked_requests > 0 ? 'var(--danger)' : 'var(--muted)'}">
+                            ${data.blocked_requests} blocked (${blockedPercent}%)
+                        </span>
                     </div>
                 `;
             }).join('');

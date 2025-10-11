@@ -146,6 +146,7 @@ class WebDashboard:
                     'system_health': 99.9,
                     'uptime': self._format_uptime(uptime),
                     'recent_attacks': self._get_real_recent_attacks(),
+                    'recent_requests': live_data.get('requests', []),  # Include recent requests for real-time display
                     'performance_metrics': self._get_performance_metrics(),
                     'protection_status': {
                         'rate_limiting': True,
@@ -418,12 +419,56 @@ class WebDashboard:
         return f"{hours}h {minutes}m"
 
     def _get_performance_metrics(self):
-        """Get current performance metrics."""
-        return {
-            'response_time_ms': 45,
-            'memory_usage_percent': 35,
-            'cpu_usage_percent': 12
-        }
+        """Get current performance metrics including IP reputation data."""
+        try:
+            # Get real IP request counts from shield manager
+            live_data = self.shield_manager.get_live_requests()
+            ip_counts = live_data.get('ip_request_counts', {})
+            
+            # Get recent requests for IP reputation analysis
+            recent_requests = live_data.get('requests', [])
+            ip_reputation_data = {}
+            
+            # Analyze IP behavior for reputation scoring
+            for request in recent_requests:
+                ip = request.get('ip', 'unknown')
+                status = request.get('status', 'allowed')
+                
+                if ip not in ip_reputation_data:
+                    ip_reputation_data[ip] = {
+                        'total_requests': 0,
+                        'blocked_requests': 0,
+                        'allowed_requests': 0,
+                        'reputation_score': 100
+                    }
+                
+                ip_reputation_data[ip]['total_requests'] += 1
+                
+                if status in ['blocked', 'rate-limited', 'blackholed', 'sinkholed']:
+                    ip_reputation_data[ip]['blocked_requests'] += 1
+                else:
+                    ip_reputation_data[ip]['allowed_requests'] += 1
+                
+                # Calculate reputation score based on behavior
+                blocked_ratio = ip_reputation_data[ip]['blocked_requests'] / ip_reputation_data[ip]['total_requests']
+                ip_reputation_data[ip]['reputation_score'] = max(0, 100 - (blocked_ratio * 100))
+            
+            return {
+                'response_time_ms': 45,
+                'memory_usage_percent': 35,
+                'cpu_usage_percent': 12,
+                'ip_request_counts': ip_counts,
+                'ip_reputation_data': ip_reputation_data
+            }
+        except Exception as e:
+            logger.error(f"Error getting performance metrics: {e}")
+            return {
+                'response_time_ms': 45,
+                'memory_usage_percent': 35,
+                'cpu_usage_percent': 12,
+                'ip_request_counts': {},
+                'ip_reputation_data': {}
+            }
 
     def run(self, host='0.0.0.0', port=8080, debug=False):
         """Run the enhanced dashboard server."""
