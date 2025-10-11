@@ -11,11 +11,22 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies
 RUN pip install flask requests gunicorn
 
+# Create non-root user
+RUN useradd -m -u 1000 loadbalancer
+
 # Copy load balancer application
 COPY docker/load_balancer_app.py /app/app.py
 
+# Create templates directory and copy template file
+RUN mkdir -p /app/templates
+COPY docker/templates/load_balancer.html /app/templates/load_balancer.html
+
 # Create logs directory
 RUN mkdir -p /app/logs
+
+# Set ownership of everything to loadbalancer user
+RUN chown -R loadbalancer:loadbalancer /app
+USER loadbalancer
 
 # Set environment variables
 ENV FLASK_ENV=production
@@ -27,10 +38,6 @@ EXPOSE 8090
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8090/health || exit 1
-
-# Create non-root user
-RUN useradd -m -u 1000 loadbalancer && chown -R loadbalancer:loadbalancer /app
-USER loadbalancer
 
 # Start the load balancer
 CMD ["python", "app.py"]

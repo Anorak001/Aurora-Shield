@@ -3,7 +3,7 @@
 Load Balancer Service for Aurora Shield
 """
 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template
 import requests
 import random
 import logging
@@ -63,65 +63,10 @@ def home():
     """Load balancer status page."""
     uptime = datetime.now() - stats['start_time']
     
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Aurora Shield Load Balancer</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            .header { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-            .status { display: flex; gap: 20px; margin: 20px 0; }
-            .cdn-box { border: 1px solid #ddd; padding: 15px; border-radius: 5px; flex: 1; }
-            .active { border-color: #27ae60; background-color: #f8fff8; }
-            .inactive { border-color: #e74c3c; background-color: #fff8f8; }
-            .stats { margin: 20px 0; }
-            .actions { margin: 20px 0; }
-            button { padding: 8px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
-            .btn-primary { background-color: #3498db; color: white; }
-            .btn-danger { background-color: #e74c3c; color: white; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>🛡️ Aurora Shield Load Balancer</h1>
-            <p>Multi-CDN Traffic Distribution System</p>
-        </div>
-        
-        <div class="stats">
-            <h3>📊 Statistics</h3>
-            <p><strong>Uptime:</strong> {{ uptime }}</p>
-            <p><strong>Total Requests:</strong> {{ stats.requests_total }}</p>
-            <p><strong>Errors:</strong> {{ stats.errors }}</p>
-        </div>
-        
-        <div class="status">
-            {% for name, config in cdns.items() %}
-            <div class="cdn-box {{ 'active' if config.status == 'active' else 'inactive' }}">
-                <h4>{{ name|title }} CDN</h4>
-                <p><strong>Status:</strong> {{ config.status|title }}</p>
-                <p><strong>Weight:</strong> {{ config.weight }}</p>
-                <p><strong>Requests:</strong> {{ stats.requests_by_cdn[name] }}</p>
-                <p><strong>URL:</strong> {{ config.url }}</p>
-            </div>
-            {% endfor %}
-        </div>
-        
-        <div class="actions">
-            <h3>🎛️ Actions</h3>
-            <a href="/cdn/"><button class="btn-primary">Test Load Balanced CDN</button></a>
-            <a href="/cdn/primary/"><button class="btn-primary">Test Primary CDN</button></a>
-            <a href="/cdn/secondary/"><button class="btn-primary">Test Secondary CDN</button></a>
-            <a href="/cdn/tertiary/"><button class="btn-primary">Test Tertiary CDN</button></a>
-        </div>
-    </body>
-    </html>
-    """
-    
-    return render_template_string(html, 
-                                cdns=CDN_SERVICES, 
-                                stats=stats, 
-                                uptime=str(uptime).split('.')[0])
+    return render_template('load_balancer.html', 
+                         cdns=CDN_SERVICES, 
+                         stats=stats, 
+                         uptime=str(uptime).split('.')[0])
 
 @app.route('/health')
 def health():
@@ -206,6 +151,98 @@ def get_stats():
         'cdns': CDN_SERVICES,
         'uptime': str(datetime.now() - stats['start_time']).split('.')[0]
     })
+
+@app.route('/api/cdn/restart', methods=['POST'])
+def restart_cdn():
+    """Restart a specific CDN service."""
+    try:
+        data = request.get_json()
+        cdn_name = data.get('cdn')
+        
+        if not cdn_name:
+            return jsonify({'error': 'CDN name is required'}), 400
+            
+        # Map the service names to CDN names
+        service_to_cdn = {
+            'demo-webapp': 'primary',
+            'demo-webapp-cdn2': 'secondary', 
+            'demo-webapp-cdn3': 'tertiary'
+        }
+        
+        cdn_key = service_to_cdn.get(cdn_name)
+        if not cdn_key or cdn_key not in CDN_SERVICES:
+            return jsonify({'error': f'Unknown CDN service: {cdn_name}'}), 400
+            
+        # Simulate restart by marking as inactive then active
+        CDN_SERVICES[cdn_key]['status'] = 'inactive'
+        time.sleep(1)  # Simulate restart delay
+        CDN_SERVICES[cdn_key]['status'] = 'active'
+        
+        logger.info(f"Restarted CDN service: {cdn_name} ({cdn_key})")
+        
+        return jsonify({
+            'success': True,
+            'message': f'CDN {cdn_name} restarted successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error restarting CDN: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/cdn/migrate', methods=['POST'])
+def migrate_cdn():
+    """Migrate traffic from one CDN to another."""
+    try:
+        data = request.get_json()
+        source = data.get('source')
+        destination = data.get('destination')
+        
+        if not source or not destination:
+            return jsonify({'error': 'Both source and destination CDN names are required'}), 400
+            
+        if source == destination:
+            return jsonify({'error': 'Source and destination must be different'}), 400
+            
+        # Map service names to CDN names
+        service_to_cdn = {
+            'demo-webapp': 'primary',
+            'demo-webapp-cdn2': 'secondary',
+            'demo-webapp-cdn3': 'tertiary'
+        }
+        
+        source_key = service_to_cdn.get(source)
+        dest_key = service_to_cdn.get(destination)
+        
+        if not source_key or source_key not in CDN_SERVICES:
+            return jsonify({'error': f'Unknown source CDN: {source}'}), 400
+            
+        if not dest_key or dest_key not in CDN_SERVICES:
+            return jsonify({'error': f'Unknown destination CDN: {destination}'}), 400
+            
+        # Simulate migration by temporarily disabling source and increasing destination weight
+        original_source_weight = CDN_SERVICES[source_key]['weight']
+        original_dest_weight = CDN_SERVICES[dest_key]['weight']
+        
+        # Transfer weight from source to destination
+        CDN_SERVICES[source_key]['weight'] = 0
+        CDN_SERVICES[dest_key]['weight'] += original_source_weight
+        
+        logger.info(f"Migrated traffic from {source} ({source_key}) to {destination} ({dest_key})")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Traffic migrated from {source} to {destination}',
+            'timestamp': datetime.now().isoformat(),
+            'weights': {
+                source_key: CDN_SERVICES[source_key]['weight'],
+                dest_key: CDN_SERVICES[dest_key]['weight']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error migrating CDN: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     logger.info("Starting Aurora Shield Load Balancer on port 8090")
