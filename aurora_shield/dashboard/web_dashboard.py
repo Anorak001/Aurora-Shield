@@ -216,7 +216,7 @@ class WebDashboard:
 
         @self.app.route('/api/sinkhole/status')
         def get_sinkhole_status():
-            """Get sinkhole/blackhole status"""
+            """Get current sinkhole/blackhole status"""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
             
@@ -231,6 +231,52 @@ class WebDashboard:
             except Exception as e:
                 logger.error(f"Error fetching sinkhole status: {e}")
                 return jsonify({'error': 'Failed to fetch sinkhole status'}), 500
+
+        @self.app.route('/api/dashboard/attacking-ips')
+        def get_attacking_ips():
+            """Get comprehensive attacking IPs and actions taken"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                
+                # Get sinkhole data
+                sinkhole_data = sinkhole_manager.get_all_sinkholed_ips()
+                
+                # Get recent attack activity from live requests
+                live_data = self.shield_manager.get_live_requests()
+                recent_attacks = []
+                
+                # Process recent blocked/sinkholed requests
+                for request_info in live_data.get('recent_requests', [])[-50:]:  # Last 50 requests
+                    if request_info.get('status') in ['blocked', 'sinkholed', 'quarantined']:
+                        action_taken = self._determine_action_taken(request_info.get('ip'), sinkhole_data)
+                        recent_attacks.append({
+                            'ip': request_info.get('ip'),
+                            'timestamp': request_info.get('timestamp'),
+                            'attack_type': request_info.get('reason', 'Unknown'),
+                            'action_taken': action_taken,
+                            'status': request_info.get('status'),
+                            'user_agent': request_info.get('user_agent', 'Unknown')[:50] + '...' if len(request_info.get('user_agent', '')) > 50 else request_info.get('user_agent', 'Unknown')
+                        })
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'sinkhole_summary': sinkhole_data['total_counts'],
+                        'recent_attacks': recent_attacks[-20:],  # Last 20 attacks
+                        'sinkholed_ips': list(sinkhole_data['ip_sinkholes'])[:50],  # Top 50 sinkholed IPs
+                        'blackholed_ips': list(sinkhole_data['ip_blackholes'])[:50],  # Top 50 blackholed IPs
+                        'quarantined_ips': {
+                            ip: info for ip, info in list(sinkhole_data['quarantined_ips'].items())[:20]  # Top 20 quarantined
+                        }
+                    },
+                    'timestamp': time.time()
+                })
+            except Exception as e:
+                logger.error(f"Error fetching attacking IPs: {e}")
+                return jsonify({'error': 'Failed to fetch attacking IP data'}), 500
 
         @self.app.route('/api/sinkhole/add', methods=['POST'])
         def add_to_sinkhole():
@@ -411,6 +457,19 @@ class WebDashboard:
         except Exception as e:
             logger.error(f"Error getting recent attacks: {e}")
             return []
+    
+    def _determine_action_taken(self, ip: str, sinkhole_data: dict) -> str:
+        """Determine what action was taken for a specific IP"""
+        if ip in sinkhole_data.get('ip_blackholes', []):
+            return 'Blackholed (Complete Block)'
+        elif ip in sinkhole_data.get('ip_sinkholes', []):
+            return 'Sinkholed (Intelligence Gathering)'
+        elif ip in sinkhole_data.get('quarantined_ips', {}):
+            quarantine_info = sinkhole_data['quarantined_ips'][ip]
+            time_left = int(quarantine_info.get('time_remaining', 0))
+            return f'Quarantined ({time_left}s remaining)'
+        else:
+            return 'Blocked (Rate Limited)'
 
     def _format_uptime(self, uptime_seconds):
         """Format uptime in a human-readable format."""

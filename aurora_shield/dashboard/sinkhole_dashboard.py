@@ -32,6 +32,28 @@ def get_status():
             'timestamp': time.time()
         }), 500
 
+@sinkhole_app.route('/api/sinkhole/list')
+def get_sinkholed_ips():
+    """Get comprehensive list of all sinkholed IPs and details"""
+    try:
+        sinkhole_data = sinkhole_manager.get_all_sinkholed_ips()
+        queue_status = sinkhole_manager.get_quarantine_queue_status()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                **sinkhole_data,
+                'queue_status': queue_status
+            },
+            'timestamp': time.time()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': time.time()
+        }), 500
+
 @sinkhole_app.route('/api/sinkhole/add', methods=['POST'])
 def add_to_sinkhole():
     """Add IP/subnet/fingerprint to sinkhole"""
