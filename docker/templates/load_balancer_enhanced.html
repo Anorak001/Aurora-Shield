@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield Load Balancer - Round Robin Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --border: #374151;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            margin-bottom: 20px;
+            color: var(--accent-blue);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-blue);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .cdn-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .cdn-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid transparent;
+        }
+
+        .cdn-item.active {
+            border-left-color: var(--accent-green);
+        }
+
+        .cdn-item.inactive {
+            border-left-color: var(--accent-red);
+            opacity: 0.6;
+        }
+
+        .cdn-name {
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .cdn-url {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .cdn-stats {
+            text-align: right;
+        }
+
+        .cdn-requests {
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        .cdn-failures {
+            color: var(--accent-red);
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .status-inactive {
+            background: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+
+        .round-robin-info {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .algorithm-badge {
+            background: var(--accent-green);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--accent-green);
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .logs {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .last-update {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .updating {
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔀 Aurora Shield Load Balancer</h1>
+        <p>Round-Robin Distribution Dashboard with Real-time Monitoring</p>
+    </div>
+
+    <div class="dashboard">
+        <!-- Statistics Card -->
+        <div class="card">
+            <h3>📊 Load Balancer Statistics</h3>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="total-requests">0</span>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="allowed-requests">0</span>
+                    <div class="stat-label">Allowed</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="blocked-requests">0</span>
+                    <div class="stat-label">Blocked</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="request-rate">0.0</span>
+                    <div class="stat-label">Req/sec</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="success-rate">0%</span>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="uptime">0s</span>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+            <div class="round-robin-info">
+                <span class="algorithm-badge">Round-Robin Algorithm</span>
+                <div style="margin-top: 10px;">
+                    <strong>Next CDN Index:</strong> <span id="round-robin-index">0</span><br>
+                    <strong>Last Request:</strong> <span id="last-request">Never</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CDN Health Card -->
+        <div class="card">
+            <h3>🌐 CDN Health Status</h3>
+            <div class="cdn-list" id="cdn-list">
+                <!-- CDN items will be populated here -->
+            </div>
+        </div>
+
+        <!-- Request Distribution Card -->
+        <div class="card">
+            <h3>📈 Request Distribution</h3>
+            <div id="distribution-chart">
+                <!-- Distribution bars will be populated here -->
+            </div>
+        </div>
+
+        <!-- System Logs Card -->
+        <div class="card">
+            <h3>📝 System Logs</h3>
+            <div class="logs" id="system-logs">
+                Loading system logs...
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
+        <button class="btn btn-success" onclick="testLoadBalancer()">🧪 Test Load Balancer</button>
+        <button class="btn" onclick="toggleAutoRefresh()">⏱️ Toggle Auto-refresh</button>
+    </div>
+
+    <div class="last-update">
+        Last updated: <span id="last-update-time">Never</span>
+    </div>
+
+    <script>
+        let autoRefresh = true;
+        let refreshInterval;
+
+        // Start auto-refresh
+        startAutoRefresh();
+
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(refreshData, 2000); // Refresh every 2 seconds
+        }
+
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            if (autoRefresh) {
+                startAutoRefresh();
+                document.querySelector('[onclick="toggleAutoRefresh()"]').textContent = '⏱️ Toggle Auto-refresh (ON)';
+            } else {
+                clearInterval(refreshInterval);
+                document.querySelector('[onclick="toggleAutoRefresh()"]').textContent = '⏱️ Toggle Auto-refresh (OFF)';
+            }
+        }
+
+        async function refreshData() {
+            try {
+                document.body.classList.add('updating');
+                
+                const response = await fetch('/stats');
+                const data = await response.json();
+                
+                updateStatistics(data);
+                updateCDNHealth(data.cdn_health);
+                updateDistribution(data.requests_by_cdn);
+                
+                document.getElementById('last-update-time').textContent = new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('Failed to refresh data:', error);
+                addLogMessage('ERROR: Failed to refresh dashboard data');
+            } finally {
+                document.body.classList.remove('updating');
+            }
+        }
+
+        function updateStatistics(data) {
+            document.getElementById('total-requests').textContent = data.requests_total || 0;
+            document.getElementById('allowed-requests').textContent = data.requests_allowed || 0;
+            document.getElementById('blocked-requests').textContent = data.requests_blocked || 0;
+            document.getElementById('request-rate').textContent = (data.request_rate || 0).toFixed(1);
+            document.getElementById('success-rate').textContent = (data.success_rate || 0).toFixed(1) + '%';
+            document.getElementById('uptime').textContent = data.uptime || '0s';
+            document.getElementById('round-robin-index').textContent = data.round_robin_index || 0;
+            
+            const lastRequest = data.last_request ? new Date(data.last_request).toLocaleTimeString() : 'Never';
+            document.getElementById('last-request').textContent = lastRequest;
+        }
+
+        function updateCDNHealth(cdnHealth) {
+            const cdnList = document.getElementById('cdn-list');
+            cdnList.innerHTML = '';
+            
+            for (const [name, info] of Object.entries(cdnHealth)) {
+                const cdnItem = document.createElement('div');
+                cdnItem.className = `cdn-item ${info.status}`;
+                
+                cdnItem.innerHTML = `
+                    <div>
+                        <span class="status-indicator status-${info.status}"></span>
+                        <div class="cdn-name">${name.charAt(0).toUpperCase() + name.slice(1)} CDN</div>
+                        <div class="cdn-url">${info.url}</div>
+                    </div>
+                    <div class="cdn-stats">
+                        <div class="cdn-requests">${info.requests} requests</div>
+                        <div class="cdn-failures">${info.failures} failures</div>
+                    </div>
+                `;
+                
+                cdnList.appendChild(cdnItem);
+            }
+        }
+
+        function updateDistribution(requestsByCdn) {
+            const distributionChart = document.getElementById('distribution-chart');
+            distributionChart.innerHTML = '';
+            
+            const total = Object.values(requestsByCdn).reduce((sum, count) => sum + count, 0);
+            
+            for (const [cdn, count] of Object.entries(requestsByCdn)) {
+                const percentage = total > 0 ? (count / total * 100) : 0;
+                
+                const barContainer = document.createElement('div');
+                barContainer.style.marginBottom = '10px';
+                
+                barContainer.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span style="color: var(--text-primary); font-weight: bold;">${cdn.charAt(0).toUpperCase() + cdn.slice(1)}</span>
+                        <span style="color: var(--text-secondary);">${count} (${percentage.toFixed(1)}%)</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div style="background: var(--accent-blue); height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+                    </div>
+                `;
+                
+                distributionChart.appendChild(barContainer);
+            }
+        }
+
+        function addLogMessage(message) {
+            const logs = document.getElementById('system-logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        async function testLoadBalancer() {
+            addLogMessage('Starting load balancer test...');
+            
+            try {
+                for (let i = 0; i < 5; i++) {
+                    const response = await fetch('/cdn/');
+                    addLogMessage(`Test request ${i + 1}: ${response.status}`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                addLogMessage('Load balancer test completed');
+                
+                // Refresh data after test
+                setTimeout(refreshData, 1000);
+                
+            } catch (error) {
+                addLogMessage(`Test failed: ${error.message}`);
+            }
+        }
+
+        // Initial load
+        refreshData();
+    </script>
+</body>
+</html>

@@ -20,9 +20,10 @@ RUN useradd -m -u 1000 loadbalancer && \
 # Copy load balancer application
 COPY docker/load_balancer_app.py /app/app.py
 
-# Create templates directory and copy template file
+# Create templates directory and copy template files
 RUN mkdir -p /app/templates
 COPY docker/templates/load_balancer.html /app/templates/load_balancer.html
+COPY docker/templates/load_balancer_enhanced.html /app/templates/load_balancer_enhanced.html
 
 # Create logs directory
 RUN mkdir -p /app/logs

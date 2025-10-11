@@ -3,7 +3,7 @@
 Load Balancer Service for Aurora Shield
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect
 import requests
 import random
 import logging
@@ -49,28 +49,55 @@ CDN_SERVICES = {
 stats = {
     'requests_total': 0,
     'requests_by_cdn': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+    'requests_allowed': 0,
+    'requests_blocked': 0,
     'errors': 0,
-    'start_time': datetime.now()
+    'cdn_failures': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+    'start_time': datetime.now(),
+    'last_request_time': None
 }
 
-def get_weighted_cdn():
-    """Select CDN based on weights and active status."""
-    # Only include CDNs that are active AND have weight > 0 (enabled via toggle)
+# Round-robin state
+round_robin_state = {
+    'current_index': 0,
+    'last_health_check': 0
+}
+
+def check_individual_cdn_health(cdn_name, cdn_config):
+    """Check if a CDN service is healthy."""
+    try:
+        health_response = requests.get(f"{cdn_config['url']}/health", timeout=2)
+        if health_response.status_code == 200:
+            cdn_config['status'] = 'active'
+            return True
+    except:
+        pass
+    
+    cdn_config['status'] = 'inactive'
+    return False
+
+def get_next_cdn_roundrobin():
+    """Get next CDN using round-robin algorithm with health checking."""
+    current_time = time.time()
+    
+    # Health check every 30 seconds
+    if current_time - round_robin_state['last_health_check'] > 30:
+        for name, config in CDN_SERVICES.items():
+            check_individual_cdn_health(name, config)
+        round_robin_state['last_health_check'] = current_time
+    
+    # Get list of active CDNs
     active_cdns = [(name, config) for name, config in CDN_SERVICES.items() 
-                   if config['status'] == 'active' and config['weight'] > 0]
+                   if config['status'] == 'active']
     
     if not active_cdns:
         return None
     
-    # Create weighted list
-    weighted_list = []
-    for name, config in active_cdns:
-        weighted_list.extend([name] * config['weight'])
+    # Round-robin selection
+    cdn_name, cdn_config = active_cdns[round_robin_state['current_index'] % len(active_cdns)]
+    round_robin_state['current_index'] = (round_robin_state['current_index'] + 1) % len(active_cdns)
     
-    if not weighted_list:
-        return None
-        
-    return random.choice(weighted_list)
+    return cdn_name
 
 @app.route('/')
 def home():
@@ -131,7 +158,7 @@ def load_balanced():
         logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
         # If Aurora Shield is unreachable, log but allow the request
     
-    selected_cdn = get_weighted_cdn()
+    selected_cdn = get_next_cdn_roundrobin()
     if not selected_cdn:
         stats['errors'] += 1
         return jsonify({'error': 'No active CDN available'}), 503
@@ -221,11 +248,53 @@ def direct_cdn(cdn_name):
 @app.route('/stats')
 def get_stats():
     """Get load balancer statistics."""
+    uptime = datetime.now() - stats['start_time']
+    
+    # Calculate rates
+    total_seconds = uptime.total_seconds()
+    request_rate = stats['requests_total'] / max(total_seconds, 1)
+    
+    # Calculate success rate
+    success_requests = stats['requests_allowed']
+    success_rate = (success_requests / max(stats['requests_total'], 1)) * 100
+    
+    # Get CDN health status
+    cdn_health = {}
+    for name, config in CDN_SERVICES.items():
+        cdn_health[name] = {
+            'status': config['status'],
+            'requests': stats['requests_by_cdn'].get(name, 0),
+            'failures': stats['cdn_failures'].get(name, 0),
+            'url': config['url']
+        }
+    
     return jsonify({
-        'stats': stats,
-        'cdns': CDN_SERVICES,
-        'uptime': str(datetime.now() - stats['start_time']).split('.')[0]
+        'requests_total': stats['requests_total'],
+        'requests_allowed': stats['requests_allowed'],
+        'requests_blocked': stats['requests_blocked'],
+        'requests_by_cdn': stats['requests_by_cdn'],
+        'cdn_failures': stats['cdn_failures'],
+        'errors': stats['errors'],
+        'request_rate': round(request_rate, 2),
+        'success_rate': round(success_rate, 1),
+        'uptime_seconds': int(total_seconds),
+        'uptime': str(uptime).split('.')[0],
+        'last_request': stats['last_request_time'].isoformat() if stats['last_request_time'] else None,
+        'cdn_health': cdn_health,
+        'algorithm': 'round-robin',
+        'round_robin_index': round_robin_state['current_index'],
+        'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/dashboard')
+def enhanced_dashboard():
+    """Enhanced load balancer dashboard with real-time monitoring."""
+    return render_template('load_balancer_enhanced.html')
+
+@app.route('/')
+def index():
+    """Redirect to enhanced dashboard."""
+    return redirect('/dashboard')
 
 @app.route('/api/cdn/health')
 def check_cdn_health():
