@@ -692,8 +692,16 @@
         {% else %}
         <!-- Main Dashboard -->
         <div class="header">
-            <h1>🛡️ Aurora Shield Dashboard</h1>
-            <p>Real-time DDoS protection monitoring and mitigation controls</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                    <h1>🛡️ Aurora Shield Dashboard</h1>
+                    <p>Real-time DDoS protection monitoring and mitigation controls</p>
+                </div>
+                <div style="text-align: right; color: var(--muted);">
+                    <div id="system-clock" style="font-size: 18px; font-weight: bold; color: var(--primary);"></div>
+                    <div style="font-size: 12px;">System Time</div>
+                </div>
+            </div>
         </div>
         
         <!-- Tab Navigation -->
@@ -736,7 +744,10 @@
                     </div>
                 </div>
                 
-                <div class="panel-title" style="margin-top: 30px;">🚨 Recent Attack Activity</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+                    <div class="panel-title">🚨 Recent Attack Activity</div>
+                    <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
+                </div>
                 <div class="attack-log" id="attackLog">
                     <!-- Attack logs will be populated by JavaScript -->
                 </div>
@@ -988,6 +999,14 @@
                     document.getElementById('uptime').textContent = data.uptime || '24h 15m';
                     document.getElementById('active-mitigations').textContent = data.active_mitigations || '3';
                     
+                    // Update "Last Updated" timestamp
+                    const now = new Date();
+                    const timestamp = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+                    const lastUpdatedElement = document.getElementById('last-updated');
+                    if (lastUpdatedElement) {
+                        lastUpdatedElement.textContent = `Last updated: ${timestamp}`;
+                    }
+                    
                     // Update attack log
                     updateAttackLog(data.recent_attacks || []);
                 })
@@ -1001,13 +1020,10 @@
             const log = document.getElementById('attackLog');
             if (!log) return;
             
+            // Show real attack data if available, otherwise show empty state
             if (attacks.length === 0) {
-                // Simulate some recent attacks for demo
-                attacks = [
-                    { timestamp: new Date().toISOString(), type: 'HTTP Flood', source: '192.168.1.100', status: 'Blocked' },
-                    { timestamp: new Date(Date.now() - 30000).toISOString(), type: 'DDoS', source: '10.0.0.50', status: 'Mitigated' },
-                    { timestamp: new Date(Date.now() - 60000).toISOString(), type: 'Slowloris', source: '172.16.0.25', status: 'Blocked' },
-                ];
+                log.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px;">No recent attacks detected</div>';
+                return;
             }
 
             log.innerHTML = attacks.slice(0, 5).map(attack => `
@@ -1018,10 +1034,36 @@
                     </div>
                     <div>
                         <span style="color: var(--success); margin-right: 8px;">${attack.status}</span>
-                        <span style="color: var(--muted); font-size: 11px;">${new Date(attack.timestamp).toLocaleTimeString()}</span>
+                        <span style="color: var(--muted); font-size: 11px;">${formatAttackTimestamp(attack.timestamp)}</span>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function formatAttackTimestamp(timestamp) {
+            // Handle different timestamp formats from Aurora Shield
+            let date;
+            
+            if (typeof timestamp === 'string') {
+                if (timestamp.includes('T')) {
+                    // ISO format
+                    date = new Date(timestamp);
+                } else if (timestamp.includes(' ')) {
+                    // Format: "2024-10-11 14:05:23.123"
+                    date = new Date(timestamp.replace(' ', 'T'));
+                } else {
+                    // Just time format: "14:05:23.123"
+                    const today = new Date().toISOString().split('T')[0];
+                    date = new Date(today + 'T' + timestamp);
+                }
+            } else {
+                date = new Date(timestamp);
+            }
+            
+            // Return formatted time with milliseconds
+            const timeStr = date.toLocaleTimeString();
+            const ms = date.getMilliseconds().toString().padStart(3, '0');
+            return `${timeStr}.${ms}`;
         }
 
         function updateMitigationStatus() {
@@ -1166,13 +1208,27 @@
         }
 
         function fetchLiveRequests() {
-            // Try to fetch real data first
+            // Get real data from Aurora Shield
             fetch('/api/dashboard/live-requests')
                 .then(response => response.json())
                 .then(data => {
-                    processLiveRequests(data.requests || []);
+                    if (data.requests) {
+                        processLiveRequests(data.requests);
+                        
+                        // Update counters with real data
+                        liveRequestsData.requestsPerSec = data.requests_per_second || 0;
+                        liveRequestsData.blockedCount = data.blocked_count || 0;
+                        liveRequestsData.allowedCount = data.allowed_count || 0;
+                        liveRequestsData.rateLimitedCount = data.rate_limited_count || 0;
+                        liveRequestsData.ipCounters = data.ip_request_counts || {};
+                        
+                        // Update displays
+                        updateLiveStats();
+                        updateRateLimitViz();
+                    }
                 })
                 .catch(error => {
+                    console.log('Using simulated data for demo:', error);
                     // Fallback to simulated data for demo
                     generateSimulatedRequests();
                 });
@@ -1246,41 +1302,39 @@
         }
 
         function processLiveRequests(requests) {
-            requests.forEach(request => {
-                const ip = request.ip;
-                
-                // Update counters
-                if (!liveRequestsData.ipCounters[ip]) {
-                    liveRequestsData.ipCounters[ip] = 0;
-                }
-                liveRequestsData.ipCounters[ip]++;
-                
-                switch(request.status) {
-                    case 'blocked':
-                        liveRequestsData.blockedCount++;
-                        break;
-                    case 'rate-limited':
-                        liveRequestsData.rateLimitedCount++;
-                        break;
-                    default:
-                        liveRequestsData.allowedCount++;
-                }
-                
-                addRequestToStream(request);
-                updateIPReputationData(ip, request.status);
-            });
+            // Clear existing requests and process new ones
+            const stream = document.getElementById('request-stream');
+            if (stream) {
+                stream.innerHTML = '';
+            }
             
-            liveRequestsData.requestsPerSec = requests.length;
+            requests.forEach(request => {
+                // Process real request data
+                addRequestToStream(request);
+                updateIPReputationData(request.ip, request.status);
+            });
         }
 
         function addRequestToStream(request) {
             const stream = document.getElementById('request-stream');
             if (!stream) return;
             
+            // Use real-time timestamp - prefer the timestamp_display or format from timestamp_iso
+            let displayTime;
+            if (request.timestamp_display) {
+                displayTime = request.timestamp_display;
+            } else if (request.timestamp_iso) {
+                displayTime = new Date(request.timestamp_iso).toLocaleTimeString() + '.' + new Date(request.timestamp_iso).getMilliseconds().toString().padStart(3, '0');
+            } else {
+                // Fallback: use current time if no proper timestamp
+                const now = new Date();
+                displayTime = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+            }
+            
             const entry = document.createElement('div');
             entry.className = 'request-entry';
             entry.innerHTML = `
-                <span class="request-timestamp">${request.timestamp}</span>
+                <span class="request-timestamp">${displayTime}</span>
                 <span class="request-ip">${request.ip}</span>
                 <span class="request-method">${request.method}</span>
                 <span class="request-url">${request.url}</span>
@@ -1409,13 +1463,27 @@
         // Auto-refresh functionality
         function startAutoRefresh() {
             refreshTabData();
+            
+            // Update system clock every second
+            updateSystemClock();
+            setInterval(updateSystemClock, 1000);
+            
             setInterval(() => {
                 if (currentTab === 'overview') {
                     updateStats();
                 } else if (currentTab === 'monitoring') {
                     updateMonitoringData();
                 }
-            }, 5000);
+            }, 1000); // 1 second updates for real-time feel
+        }
+
+        function updateSystemClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+            const clockElement = document.getElementById('system-clock');
+            if (clockElement) {
+                clockElement.textContent = timeString;
+            }
         }
 
         // Initialize dashboard

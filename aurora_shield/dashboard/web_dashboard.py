@@ -134,24 +134,27 @@ class WebDashboard:
                 return jsonify({'error': 'Authentication required'}), 401
             
             try:
-                stats = self.shield_manager.get_stats()
+                # Get real-time data from shield manager
+                live_data = self.shield_manager.get_live_requests()
+                uptime = time.time() - self.shield_manager.start_time
                 
-                # Enhanced stats with additional metrics
+                # Enhanced stats with real data
                 enhanced_stats = {
-                    'requests_per_second': stats.get('requests_per_second', 0),
-                    'threats_blocked': stats.get('threats_blocked', 0),
-                    'active_connections': stats.get('active_connections', 0),
-                    'system_health': stats.get('system_health', 99.9),
-                    'uptime': self._get_uptime(),
-                    'recent_attacks': self._get_recent_attacks(),
+                    'requests_per_second': live_data.get('requests_per_second', 0),
+                    'threats_blocked': live_data.get('blocked_count', 0),
+                    'active_connections': len(live_data.get('ip_request_counts', {})),
+                    'system_health': 99.9,
+                    'uptime': self._format_uptime(uptime),
+                    'recent_attacks': self._get_real_recent_attacks(),
                     'performance_metrics': self._get_performance_metrics(),
                     'protection_status': {
                         'rate_limiting': True,
-                        'challenge_response': True,
                         'ip_reputation': True,
-                        'bot_detection': True,
-                        'adaptive_learning': True
-                    }
+                        'anomaly_detection': True
+                    },
+                    'total_requests': live_data.get('total_requests', 0),
+                    'allowed_requests': live_data.get('allowed_count', 0),
+                    'rate_limited_requests': live_data.get('rate_limited_count', 0)
                 }
                 
                 return jsonify(enhanced_stats)
@@ -159,6 +162,21 @@ class WebDashboard:
             except Exception as e:
                 logger.error(f"Error fetching dashboard stats: {e}")
                 return jsonify({'error': 'Failed to fetch statistics'}), 500
+
+        @self.app.route('/api/dashboard/live-requests')
+        def get_live_requests():
+            """Get real-time request data for live monitoring."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # Get actual live requests from shield manager
+                live_data = self.shield_manager.get_live_requests()
+                return jsonify(live_data)
+                
+            except Exception as e:
+                logger.error(f"Error fetching live requests: {e}")
+                return jsonify({'error': 'Failed to fetch live requests'}), 500
 
         @self.app.route('/api/dashboard/simulate', methods=['POST'])
         def simulate_attack():
@@ -265,26 +283,40 @@ class WebDashboard:
         except:
             return "Unknown"
 
-    def _get_recent_attacks(self):
-        """Get recent attack attempts."""
+    def _get_real_recent_attacks(self):
+        """Get actual recent attack attempts from blocked requests."""
         try:
-            # In a real implementation, this would fetch from logs/database
-            return [
-                {
-                    'timestamp': datetime.now().isoformat(),
-                    'type': 'HTTP Flood',
-                    'source': '192.168.1.100',
-                    'status': 'Blocked'
-                },
-                {
-                    'timestamp': (datetime.now() - datetime.timedelta(minutes=5)).isoformat(),
-                    'type': 'DDoS',
-                    'source': '10.0.0.50',
-                    'status': 'Mitigated'
-                }
-            ]
-        except:
+            # Get recent blocked requests from shield manager
+            recent_requests = self.shield_manager.recent_requests[:10]
+            attacks = []
+            
+            for req in recent_requests:
+                if req['status'] in ['blocked', 'rate-limited']:
+                    attack_type = 'Rate Limiting' if req['status'] == 'rate-limited' else 'Malicious Request'
+                    
+                    # Use the proper timestamp format
+                    timestamp = req.get('timestamp_iso', req.get('timestamp'))
+                    if not timestamp:
+                        timestamp = datetime.now().isoformat()
+                    
+                    attacks.append({
+                        'timestamp': timestamp,
+                        'type': attack_type,
+                        'source': req['ip'],
+                        'status': 'Blocked' if req['status'] == 'blocked' else 'Rate Limited',
+                        'url': req['url']
+                    })
+            
+            return attacks[:5]  # Return last 5 attacks
+        except Exception as e:
+            logger.error(f"Error getting recent attacks: {e}")
             return []
+
+    def _format_uptime(self, uptime_seconds):
+        """Format uptime in a human-readable format."""
+        hours = int(uptime_seconds // 3600)
+        minutes = int((uptime_seconds % 3600) // 60)
+        return f"{hours}h {minutes}m"
 
     def _get_performance_metrics(self):
         """Get current performance metrics."""

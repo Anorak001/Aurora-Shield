@@ -4,6 +4,7 @@ Main Aurora Shield manager that coordinates all components.
 
 import logging
 import time
+from datetime import datetime
 from aurora_shield.core.anomaly_detector import AnomalyDetector
 from aurora_shield.mitigation.rate_limiter import RateLimiter
 from aurora_shield.mitigation.ip_reputation import IPReputation
@@ -43,7 +44,16 @@ class AuroraShieldManager:
         # Request tracking
         self.total_requests = 0
         self.blocked_requests = 0
+        self.allowed_requests = 0
+        self.rate_limited_requests = 0
         self.start_time = time.time()
+        
+        # Real-time request monitoring
+        self.recent_requests = []  # Keep last 100 requests
+        self.requests_per_second = 0
+        self.last_request_time = time.time()
+        self.request_count_last_second = 0
+        self.ip_request_counts = {}  # For rate limiting visualization
         
         logger.info("Aurora Shield initialized successfully")
     
@@ -69,6 +79,7 @@ class AuroraShieldManager:
                 'reason': 'ip_reputation',
                 'score': reputation['score']
             })
+            self._log_request_realtime(request_data, 'blocked', 'IP reputation too low')
             return {
                 'allowed': False,
                 'reason': 'IP reputation too low',
@@ -79,11 +90,13 @@ class AuroraShieldManager:
         rate_check = self.rate_limiter.allow_request(ip_address)
         if not rate_check['allowed']:
             self.blocked_requests += 1
+            self.rate_limited_requests += 1
             self.elk_integration.log_event('request_blocked', {
                 'ip': ip_address,
                 'reason': 'rate_limit'
             })
             self.ip_reputation.record_violation(ip_address, 'rate_limit', severity=5)
+            self._log_request_realtime(request_data, 'rate-limited', 'Rate limit exceeded')
             return {
                 'allowed': False,
                 'reason': 'Rate limit exceeded',
@@ -101,6 +114,7 @@ class AuroraShieldManager:
             })
             self.prometheus_integration.record_attack('anomaly')
             self.ip_reputation.record_violation(ip_address, 'anomaly', severity=20)
+            self._log_request_realtime(request_data, 'blocked', 'Anomaly detected')
             return {
                 'allowed': False,
                 'reason': 'Anomaly detected',
@@ -108,10 +122,64 @@ class AuroraShieldManager:
             }
         
         # All checks passed
+        self.allowed_requests += 1
         self.prometheus_integration.record_request(200, 0.1)
+        
+        # Log request for real-time monitoring
+        self._log_request_realtime(request_data, 'allowed', 'Request allowed')
+        
         return {
             'allowed': True,
             'ip': ip_address
+        }
+    
+    def _log_request_realtime(self, request_data, status, reason=''):
+        """Log request for real-time monitoring dashboard."""
+        current_time = time.time()
+        ip_address = request_data.get('ip', 'unknown')
+        
+        # Update requests per second calculation
+        if current_time - self.last_request_time < 1:
+            self.request_count_last_second += 1
+        else:
+            self.requests_per_second = self.request_count_last_second
+            self.request_count_last_second = 1
+            self.last_request_time = current_time
+        
+        # Update IP request counts for rate limiting visualization
+        if ip_address not in self.ip_request_counts:
+            self.ip_request_counts[ip_address] = 0
+        self.ip_request_counts[ip_address] += 1
+        
+        # Log the request with timestamp
+        request_log = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],  # Include milliseconds
+            'timestamp_display': datetime.now().strftime('%H:%M:%S.%f')[:-3],  # For display
+            'timestamp_iso': datetime.now().isoformat(),  # ISO format for JavaScript
+            'ip': ip_address,
+            'method': request_data.get('method', 'GET'),
+            'url': request_data.get('uri', '/'),
+            'user_agent': request_data.get('user_agent', ''),
+            'status': status,
+            'reason': reason
+        }
+        
+        # Keep only last 100 requests for real-time display
+        self.recent_requests.insert(0, request_log)
+        if len(self.recent_requests) > 100:
+            self.recent_requests = self.recent_requests[:100]
+    
+    def get_live_requests(self):
+        """Get recent requests for live monitoring."""
+        return {
+            'requests': self.recent_requests[:20],  # Last 20 requests
+            'requests_per_second': self.requests_per_second,
+            'total_requests': self.total_requests,
+            'blocked_count': self.blocked_requests,
+            'allowed_count': self.allowed_requests,
+            'rate_limited_count': self.rate_limited_requests,
+            'ip_request_counts': dict(sorted(self.ip_request_counts.items(), 
+                                           key=lambda x: x[1], reverse=True)[:10])
         }
     
     def handle_attack(self, attack_data):
@@ -204,7 +272,7 @@ class AuroraShieldManager:
             
             # Process through Aurora Shield
             result = self.process_request(request_data)
-            return result.get('action') == 'block'
+            return not result.get('allowed', True)  # Return True if should block
             
         except Exception as e:
             logger.error(f"Error checking request: {e}")
