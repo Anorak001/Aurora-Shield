@@ -291,10 +291,8 @@ def legacy_dashboard():
                          stats=stats, 
                          uptime=str(uptime).split('.')[0])
 
-@app.route('/')
-def index():
-    """Redirect to enhanced dashboard with round-robin visualization."""
-    return redirect('/dashboard')
+# Removed specific root route handler to allow catch-all to handle all user-facing paths
+# This ensures all traffic goes through Aurora Shield protection
 
 @app.route('/api/cdn/health')
 def check_cdn_health():
