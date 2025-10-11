@@ -73,6 +73,12 @@ class VirtualBotManager:
         self.active_threads: Dict[str, threading.Thread] = {}
         self.target_host = "load-balancer:8090"  # Target load balancer which routes through Aurora Shield
         self.attack_templates = {
+            'normal': {
+                'rate_range': (0.5, 5),
+                'user_agents': ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'],
+                'payloads': [50, 100, 200],
+                'paths': ['/', '/about', '/contact', '/services', '/products', '/help']
+            },
             'http_flood': {
                 'rate_range': (10, 100),
                 'user_agents': ['AttackBot/1.0', 'FloodBot/2.1', 'HTTPStorm/1.5'],
@@ -139,6 +145,10 @@ class VirtualBotManager:
         """Create a new virtual bot with specified or random configuration"""
         if not attack_type:
             attack_type = random.choice(list(self.attack_templates.keys()))
+        
+        # Validate attack type
+        if attack_type not in self.attack_templates:
+            raise ValueError(f"Invalid attack type: {attack_type}. Available types: {list(self.attack_templates.keys())}")
         
         template = self.attack_templates[attack_type]
         bot_id = f"vbot_{len(self.bots) + 1}_{int(time.time())}"
@@ -295,40 +305,79 @@ class VirtualBotManager:
             headers = {
                 'User-Agent': bot.user_agent,
                 'X-Forwarded-For': bot.ip,
-                'X-Real-IP': bot.ip
+                'X-Real-IP': bot.ip,
+                'X-Original-IP': bot.ip  # For Aurora Shield IP detection
             }
             
             if bot.randomize_headers:
                 headers.update({
-                    'Accept': random.choice(['*/*', 'text/html', 'application/json']),
-                    'Accept-Language': random.choice(['en-US', 'en-GB', 'de-DE']),
+                    'Accept': random.choice(['*/*', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'application/json']),
+                    'Accept-Language': random.choice(['en-US,en;q=0.5', 'en-GB,en;q=0.5', 'de-DE,de;q=0.5']),
+                    'Accept-Encoding': 'gzip, deflate',
                     'Connection': random.choice(['keep-alive', 'close'])
                 })
             
-            # Create payload
-            payload = 'x' * bot.payload_size if bot.payload_size > 0 else None
+            # Choose request method based on attack type
+            if bot.attack_type == 'normal':
+                method = 'GET'
+                payload = None
+            elif bot.attack_type in ['brute_force', 'resource_exhaustion']:
+                method = 'POST'
+                payload = 'x' * bot.payload_size if bot.payload_size > 0 else 'data=test&user=admin'
+            else:
+                method = random.choice(['GET', 'POST'])
+                payload = 'x' * bot.payload_size if bot.payload_size > 0 else None
             
-            # Send request (with timeout to avoid hanging)
-            response = requests.post(
-                bot.target_url,
-                headers=headers,
-                data=payload,
-                timeout=5
-            )
+            # Send request to load balancer which should forward through Aurora Shield
+            if method == 'GET':
+                response = requests.get(
+                    bot.target_url,
+                    headers=headers,
+                    timeout=10,
+                    allow_redirects=True
+                )
+            else:
+                response = requests.post(
+                    bot.target_url,
+                    headers=headers,
+                    data=payload,
+                    timeout=10,
+                    allow_redirects=True
+                )
             
             bot.total_requests += 1
             bot.last_activity = time.time()
             
+            # Check response for blocking indicators
             if response.status_code == 200:
                 bot.successful_requests += 1
-            else:
+                logger.debug(f"Bot {bot.id} request successful: {response.status_code}")
+            elif response.status_code in [403, 429, 503]:  # Common blocking status codes
                 bot.blocked_requests += 1
+                logger.debug(f"Bot {bot.id} request blocked: {response.status_code}")
+            else:
+                # Other status codes might indicate partial success or server issues
+                bot.successful_requests += 1
+                logger.debug(f"Bot {bot.id} request completed with status: {response.status_code}")
                 
-        except requests.exceptions.RequestException:
-            # Request failed (likely blocked or network issue)
+        except requests.exceptions.Timeout:
+            # Timeout might indicate rate limiting or DDoS protection
             bot.total_requests += 1
             bot.blocked_requests += 1
             bot.last_activity = time.time()
+            logger.debug(f"Bot {bot.id} request timed out (likely blocked)")
+        except requests.exceptions.ConnectionError:
+            # Connection error might indicate blocking or network issues
+            bot.total_requests += 1
+            bot.blocked_requests += 1
+            bot.last_activity = time.time()
+            logger.debug(f"Bot {bot.id} connection error (likely blocked)")
+        except requests.exceptions.RequestException as e:
+            # Other request errors
+            bot.total_requests += 1
+            bot.blocked_requests += 1
+            bot.last_activity = time.time()
+            logger.debug(f"Bot {bot.id} request exception: {e}")
         except Exception as e:
             logger.error(f"Error simulating request for bot {bot.id}: {e}")
     

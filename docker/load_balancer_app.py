@@ -1073,6 +1073,100 @@ def get_cdn_status():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+# Catch-all route for Aurora Shield protection
+@app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+def catch_all_protected(path):
+    """Catch-all route that protects all unhandled paths with Aurora Shield."""
+    logger.info(f"=== CATCH-ALL REQUEST RECEIVED for /{path} ===")
+    stats['requests_total'] += 1
+    
+    # Extract request information
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', '')
+    method = request.method
+    full_path = f"/{path}"
+    
+    logger.info(f"Processing {method} request for {full_path} from IP: {client_ip}")
+    
+    try:
+        # Send request to Aurora Shield for authorization
+        logger.info(f"Checking request with Aurora Shield for IP: {client_ip}, Path: {full_path}")
+        shield_response = requests.request(
+            method.upper(),
+            'http://aurora-shield:8080/api/shield/check-request',
+            headers={
+                'X-Original-IP': client_ip,
+                'X-Original-URI': full_path,
+                'X-Original-Method': method,
+                'User-Agent': user_agent
+            },
+            data=request.get_data(),
+            timeout=5
+        )
+        
+        logger.info(f"Aurora Shield response: {shield_response.status_code}")
+        
+        # If Aurora Shield blocks the request
+        if shield_response.status_code == 403:
+            logger.warning(f"Request blocked by Aurora Shield from {client_ip} for {full_path}")
+            stats['requests_blocked'] = stats.get('requests_blocked', 0) + 1
+            return jsonify({
+                'error': 'Request blocked by Aurora Shield',
+                'reason': 'Security policy violation',
+                'path': full_path,
+                'ip': client_ip
+            }), 403
+            
+    except requests.RequestException as e:
+        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
+        # If Aurora Shield is unreachable, log but allow the request
+    
+    # If Aurora Shield allows the request, forward to a CDN
+    selected_cdn = get_next_cdn_roundrobin()
+    if not selected_cdn:
+        stats['errors'] += 1
+        return jsonify({'error': 'No active CDN available'}), 503
+    
+    stats['requests_by_cdn'][selected_cdn] += 1
+    
+    try:
+        cdn_config = CDN_SERVICES[selected_cdn]
+        target_url = f"{cdn_config['url']}/{path}"
+        
+        logger.info(f"Forwarding {method} request to {target_url}")
+        
+        # Forward the request to the selected CDN
+        response = requests.request(
+            method,
+            target_url,
+            headers={k: v for k, v in request.headers if k.lower() not in ['host', 'x-forwarded-for']},
+            data=request.get_data(),
+            params=request.args,
+            timeout=10,
+            allow_redirects=False
+        )
+        
+        # Handle the response
+        if response.headers.get('content-type', '').startswith('text/html'):
+            response_data = response.text.replace(
+                '<body>',
+                f'<body><div style="background:#27ae60;color:white;padding:10px;text-align:center;">🛡️ Protected by Aurora Shield via {selected_cdn.title()} CDN</div>'
+            )
+            return response_data, response.status_code
+        else:
+            return response.content, response.status_code, dict(response.headers)
+        
+    except requests.RequestException as e:
+        logger.error(f"Error forwarding request to {selected_cdn} CDN: {e}")
+        stats['errors'] += 1
+        # Mark CDN as inactive and return error
+        CDN_SERVICES[selected_cdn]['status'] = 'inactive'
+        return jsonify({
+            'error': f'Service temporarily unavailable',
+            'cdn': selected_cdn,
+            'path': full_path
+        }), 503
+
 if __name__ == '__main__':
     logger.info("Starting Aurora Shield Load Balancer on port 8090")
     app.run(host='0.0.0.0', port=8090, debug=False)
