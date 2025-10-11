@@ -1,0 +1,17 @@
+# Attack Simulator Container for Demo
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install requests aiohttp
+
+# Copy simulator script
+COPY docker/attack_simulator.py /app/simulator.py
+
+# Set environment variables
+ENV TARGET_HOST=aurora-shield
+ENV TARGET_PORT=8080
+
+# Run the simulator
+CMD ["python", "simulator.py"]
