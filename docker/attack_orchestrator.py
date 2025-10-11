@@ -85,7 +85,7 @@ def spawn_bots():
         data = request.get_json() or {}
         count = int(data.get('count', 10))
         attack_type = data.get('attack_type', 'http_flood')
-        target_url = data.get('target_url', 'http://load-balancer:8090/cdn/')
+        target_url = data.get('target_url', 'http://aurora-shield:8080/proxy/cdn/')
         
         if count > 50:
             return jsonify({'error': 'Maximum 50 bots allowed for safety'}), 400

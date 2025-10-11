@@ -18,7 +18,7 @@ class BotAgent:
     def __init__(self):
         # Get configuration from environment
         self.bot_ip = os.getenv('BOT_IP', '10.77.0.100')
-        self.target_url = os.getenv('TARGET_URL', 'http://load-balancer:8090/cdn/')
+        self.target_url = os.getenv('TARGET_URL', 'http://aurora-shield:8080/proxy/cdn/')
         self.attack_type = os.getenv('ATTACK_TYPE', 'http_flood')
         self.orchestrator_url = os.getenv('ORCHESTRATOR_URL', 'http://attack-orchestrator:5000')
         
@@ -159,16 +159,16 @@ class BotAgent:
     def http_flood_attack(self):
         """Standard HTTP flood attack"""
         try:
-            # Generate realistic request variations
+            # Generate realistic request variations for proxy
             paths = [
-                '/cdn/index.html',
-                '/cdn/style.css',
-                '/cdn/script.js',
-                '/cdn/image.png',
-                '/api/data',
-                '/search?q=test',
-                '/product/12345',
-                '/user/profile'
+                'index.html',
+                'style.css', 
+                'script.js',
+                'image.png',
+                '../api/data',
+                '../search?q=test',
+                '../product/12345',
+                '../user/profile'
             ]
             
             user_agents = [
@@ -181,7 +181,7 @@ class BotAgent:
             
             # Build request
             target_path = random.choice(paths)
-            url = f"{self.target_url.rstrip('/')}{target_path}"
+            url = f"{self.target_url.rstrip('/')}/{target_path}"
             
             headers = {
                 'User-Agent': random.choice(user_agents),

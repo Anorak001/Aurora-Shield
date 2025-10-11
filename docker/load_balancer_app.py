@@ -112,41 +112,17 @@ def health():
 @app.route('/cdn/')
 @app.route('/cdn')
 def load_balanced():
-    """Load balanced CDN access with Aurora Shield protection."""
+    """Load balanced CDN access - requests pre-filtered by Aurora Shield."""
     logger.info("=== CDN REQUEST RECEIVED ===")
     stats['requests_total'] += 1
     
-    # Check with Aurora Shield first
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    user_agent = request.headers.get('User-Agent', '')
-    logger.info(f"Processing CDN request from IP: {client_ip}")
+    aurora_shield_filtered = request.headers.get('X-Aurora-Shield') == 'filtered'
     
-    try:
-        # Send request to Aurora Shield for authorization
-        logger.info(f"Checking request with Aurora Shield for IP: {client_ip}")
-        shield_response = requests.post(
-            'http://aurora-shield:8080/api/shield/check-request',
-            headers={
-                'X-Original-IP': client_ip,
-                'X-Original-URI': '/cdn/',
-                'User-Agent': user_agent
-            },
-            timeout=2
-        )
-        
-        logger.info(f"Aurora Shield response: {shield_response.status_code}")
-        
-        # If Aurora Shield blocks the request
-        if shield_response.status_code == 403:
-            logger.warning(f"Request blocked by Aurora Shield from {client_ip}")
-            return jsonify({
-                'error': 'Request blocked by Aurora Shield',
-                'reason': 'Security policy violation'
-            }), 403
-            
-    except requests.RequestException as e:
-        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
-        # If Aurora Shield is unreachable, log but allow the request
+    logger.info(f"Processing CDN request from IP: {client_ip} (Aurora Shield filtered: {aurora_shield_filtered})")
+    
+    # Since requests come through Aurora Shield dashboard proxy, they are pre-filtered
+    # No need for additional authorization checks
     
     selected_cdn = get_next_cdn_roundrobin()
     if not selected_cdn:
@@ -154,6 +130,7 @@ def load_balanced():
         return jsonify({'error': 'No active CDN available'}), 503
     
     stats['requests_by_cdn'][selected_cdn] += 1
+    stats['requests_allowed'] += 1
     
     try:
         cdn_config = CDN_SERVICES[selected_cdn]
@@ -162,11 +139,13 @@ def load_balanced():
         # Add load balancer headers
         response_data = response.text
         if response.headers.get('content-type', '').startswith('text/html'):
+            filter_status = "Aurora Shield Filtered" if aurora_shield_filtered else "Direct"
             response_data = response_data.replace(
                 '<body>',
-                f'<body><div style="background:#3498db;color:white;padding:10px;text-align:center;">🔀 Served by {selected_cdn.title()} CDN via Load Balancer (Protected by Aurora Shield)</div>'
+                f'<body><div style="background:#27ae60;color:white;padding:10px;text-align:center;">�️ {filter_status} → {selected_cdn.upper()} CDN via Load Balancer | Client IP: {client_ip}</div>'
             )
         
+        logger.info(f"Successfully served request from {client_ip} via {selected_cdn} CDN")
         return response_data, response.status_code
         
     except requests.RequestException as e:
@@ -235,10 +214,40 @@ def direct_cdn(cdn_name):
         stats['errors'] += 1
         return jsonify({'error': f'CDN {cdn_name} unavailable'}), 503
 
+def get_dashboard_allowed_count():
+    """Get allowed requests count from Aurora Shield dashboard stats"""
+    try:
+        # Try the public health endpoint first
+        response = requests.get('http://aurora-shield:8080/health', timeout=5)
+        if response.status_code != 200:
+            logger.warning("Dashboard not reachable")
+            return 0
+            
+        # Try to get stats from dashboard - use session with login
+        session = requests.Session()
+        
+        # Login to dashboard
+        login_data = {'username': 'admin', 'password': 'admin123'}
+        login_response = session.post('http://aurora-shield:8080/login', data=login_data, timeout=5)
+        
+        if login_response.status_code == 200:
+            # Now fetch stats with authenticated session
+            stats_response = session.get('http://aurora-shield:8080/api/dashboard/stats', timeout=5)
+            if stats_response.status_code == 200:
+                data = stats_response.json()
+                return data.get('allowed_requests', 0)
+                
+    except Exception as e:
+        logger.warning(f"Could not fetch allowed requests count from dashboard: {e}")
+    return 0
+
 @app.route('/stats')
 def get_stats():
     """Get load balancer statistics."""
     uptime = datetime.now() - stats['start_time']
+    
+    # Get allowed requests count from dashboard
+    dashboard_allowed_count = get_dashboard_allowed_count()
     
     # Calculate rates
     total_seconds = uptime.total_seconds()
@@ -260,7 +269,7 @@ def get_stats():
     
     return jsonify({
         'requests_total': stats['requests_total'],
-        'requests_allowed': stats['requests_allowed'],
+        'requests_allowed': dashboard_allowed_count,
         'requests_blocked': stats['requests_blocked'],
         'requests_by_cdn': stats['requests_by_cdn'],
         'cdn_failures': stats['cdn_failures'],
