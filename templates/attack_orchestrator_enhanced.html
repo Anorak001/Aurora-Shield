@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield - Enhanced Attack Orchestrator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-900: #0b1220;
+            --bg-800: #0f1726;
+            --bg-700: #121627;
+            --accent: #9b7cff;
+            --accent-2: #7ee0f6;
+            --success: #00ff88;
+            --warning: #ffa502;
+            --danger: #ff4757;
+            --muted: #98a0b3;
+            --glass: rgba(255,255,255,0.03);
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: radial-gradient(1000px 400px at 10% 10%, rgba(123,87,232,0.06), transparent 10%),
+                        radial-gradient(800px 300px at 90% 90%, rgba(53,60,188,0.04), transparent 12%),
+                        var(--bg-900);
+            color: #dbe6ff;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border-radius: 14px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--muted);
+            font-size: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.03);
+            box-shadow: 0 8px 24px rgba(2,6,20,0.6);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .controls-panel {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            color: white;
+        }
+
+        .btn-primary { background: var(--accent); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); }
+        .btn-danger { background: var(--danger); }
+
+        .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+        .bots-table {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .bots-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .bots-table th {
+            background: linear-gradient(90deg, rgba(155,124,255,0.1), rgba(126,224,246,0.05));
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .bots-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 12px;
+            color: #dbe6ff;
+        }
+
+        .bots-table tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .status-active { background: rgba(0,255,136,0.2); color: var(--success); }
+        .status-paused { background: rgba(255,165,2,0.2); color: var(--warning); }
+        .status-stopped { background: rgba(255,71,87,0.2); color: var(--danger); }
+
+        .attack-type-badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .attack-http_flood { background: rgba(155,124,255,0.2); color: var(--accent); }
+        .attack-ddos_burst { background: rgba(255,71,87,0.2); color: var(--danger); }
+        .attack-slowloris { background: rgba(255,165,2,0.2); color: var(--warning); }
+        .attack-brute_force { background: rgba(126,224,246,0.2); color: var(--accent-2); }
+        .attack-resource_exhaustion { background: rgba(255,20,147,0.2); color: #ff69b4; }
+
+        .action-btn {
+            padding: 4px 8px;
+            margin: 2px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover { transform: translateY(-1px); }
+
+        .ip-family { font-family: 'Courier New', monospace; }
+
+        .create-bot-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            padding: 20px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .form-group input, .form-group select {
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            background: var(--bg-700);
+            color: #dbe6ff;
+            font-size: 12px;
+        }
+
+        .auto-refresh {
+            text-align: center;
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .refresh-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .subnet-info {
+            font-size: 10px;
+            color: var(--muted);
+            font-family: monospace;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), var(--accent));
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Enhanced Attack Orchestrator</h1>
+            <p>Virtual IP Management • Multi-Subnet Attacks • Real-time Control</p>
+        </div>
+
+        <!-- Statistics Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalBots">0</div>
+                <div class="stat-label">Total Bots</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeBots">0</div>
+                <div class="stat-label">Active Bots</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalRequests">0</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="blockRate">0%</div>
+                <div class="stat-label">Block Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="attackTypes">0</div>
+                <div class="stat-label">Attack Types</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="subnetsCount">0</div>
+                <div class="stat-label">Active Subnets</div>
+            </div>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <h3 style="color: var(--accent); margin-bottom: 16px;">🎮 Bot Fleet Control</h3>
+            
+            <div class="controls-grid">
+                <button class="btn btn-success" onclick="startAllBots()">▶️ Start All</button>
+                <button class="btn btn-danger" onclick="stopAllBots()">⏹️ Stop All</button>
+                <button class="btn btn-primary" onclick="createRandomBot()">🤖 Create Random Bot</button>
+                <button class="btn btn-warning" onclick="toggleCreateForm()">⚙️ Custom Bot</button>
+                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                <button class="btn btn-primary" onclick="exportLogs()">📊 Export Logs</button>
+            </div>
+
+            <!-- Create Bot Form -->
+            <div id="createBotForm" class="create-bot-form" style="display: none;">
+                <div class="form-group">
+                    <label>Attack Type</label>
+                    <select id="attackType">
+                        <option value="http_flood">HTTP Flood</option>
+                        <option value="ddos_burst">DDoS Burst</option>
+                        <option value="slowloris">Slowloris</option>
+                        <option value="brute_force">Brute Force</option>
+                        <option value="resource_exhaustion">Resource Exhaustion</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Rate (req/sec)</label>
+                    <input type="number" id="customRate" min="0.1" max="1000" step="0.1" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Duration (seconds)</label>
+                    <input type="number" id="customDuration" min="10" max="3600" value="60">
+                </div>
+                <div class="form-group">
+                    <label>Target Path</label>
+                    <input type="text" id="customPath" value="/api/test" placeholder="/api/endpoint">
+                </div>
+                <div class="form-group">
+                    <label>User Agent</label>
+                    <input type="text" id="customUserAgent" value="CustomBot/1.0" placeholder="Bot User Agent">
+                </div>
+                <div class="form-group">
+                    <label>Payload Size (bytes)</label>
+                    <input type="number" id="customPayload" min="0" max="50000" value="1000">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <button class="btn btn-success" onclick="createCustomBot()">🚀 Create Custom Bot</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bots Table -->
+        <div class="bots-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>IP Address</th>
+                        <th>Subnet</th>
+                        <th>Attack Type</th>
+                        <th>Status</th>
+                        <th>Rate</th>
+                        <th>Requests</th>
+                        <th>Success</th>
+                        <th>Blocked</th>
+                        <th>Uptime</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="botsTableBody">
+                    <!-- Bots will be populated here -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="auto-refresh">
+            <span class="refresh-dot"></span>
+            Auto-refreshing bot status every 3 seconds
+        </div>
+    </div>
+
+    <script>
+        let botsData = [];
+        let refreshInterval;
+        let createFormVisible = false;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            startAutoRefresh();
+        });
+
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshData, 3000);
+        }
+
+        function refreshData() {
+            fetch('/api/bots')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        botsData = data.bots;
+                        updateStatistics(data.stats);
+                        updateBotsTable();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching bots:', error);
+                });
+        }
+
+        function updateStatistics(stats) {
+            document.getElementById('totalBots').textContent = stats.total_bots;
+            document.getElementById('activeBots').textContent = stats.active_bots;
+            document.getElementById('totalRequests').textContent = stats.total_requests.toLocaleString();
+            document.getElementById('blockRate').textContent = stats.block_rate.toFixed(1) + '%';
+            document.getElementById('attackTypes').textContent = Object.keys(stats.attack_types).length;
+            document.getElementById('subnetsCount').textContent = Object.keys(stats.subnets).length;
+        }
+
+        function updateBotsTable() {
+            const tbody = document.getElementById('botsTableBody');
+            let rows = '';
+
+            botsData.forEach(bot => {
+                const statusClass = `status-${bot.status}`;
+                const attackClass = `attack-${bot.attack_type}`;
+                const successRate = bot.total_requests > 0 ? ((bot.successful_requests / bot.total_requests) * 100).toFixed(1) : '0';
+                const uptime = formatUptime(bot.uptime);
+
+                rows += `
+                    <tr>
+                        <td class="ip-family">${bot.id.split('_')[1]}</td>
+                        <td class="ip-family">${bot.ip}</td>
+                        <td class="subnet-info">${bot.subnet}</td>
+                        <td><span class="attack-type-badge ${attackClass}">${bot.attack_type}</span></td>
+                        <td><span class="status-badge ${statusClass}">${bot.status}</span></td>
+                        <td>${bot.rate.toFixed(1)}/s</td>
+                        <td>${bot.total_requests}</td>
+                        <td style="color: var(--success);">${bot.successful_requests} (${successRate}%)</td>
+                        <td style="color: var(--danger);">${bot.blocked_requests}</td>
+                        <td>${uptime}</td>
+                        <td>
+                            ${bot.status === 'stopped' ? 
+                                `<button class="action-btn btn-success" onclick="startBot('${bot.id}')">▶️</button>` :
+                                `<button class="action-btn btn-danger" onclick="stopBot('${bot.id}')">⏹️</button>`
+                            }
+                            ${bot.status === 'active' ? 
+                                `<button class="action-btn btn-warning" onclick="pauseBot('${bot.id}')">⏸️</button>` : ''
+                            }
+                            <button class="action-btn" style="background: var(--accent);" onclick="editBot('${bot.id}')">✏️</button>
+                            <button class="action-btn btn-danger" onclick="removeBot('${bot.id}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            if (botsData.length === 0) {
+                rows = '<tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--muted);">No bots created yet. Create your first bot!</td></tr>';
+            }
+
+            tbody.innerHTML = rows;
+        }
+
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${Math.floor(seconds)}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+            return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+        }
+
+        // Bot control functions
+        function startBot(botId) {
+            fetch(`/api/bots/${botId}/start`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+        }
+
+        function stopBot(botId) {
+            fetch(`/api/bots/${botId}/stop`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+        }
+
+        function pauseBot(botId) {
+            fetch(`/api/bots/${botId}/pause`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+        }
+
+        function removeBot(botId) {
+            if (confirm('Remove this bot permanently?')) {
+                fetch(`/api/bots/${botId}/remove`, { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            refreshData();
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    });
+            }
+        }
+
+        function editBot(botId) {
+            const newRate = prompt('Enter new rate (requests/second):');
+            if (newRate && !isNaN(newRate)) {
+                fetch(`/api/bots/${botId}/config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rate: parseFloat(newRate) })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        }
+
+        // Bulk operations
+        function startAllBots() {
+            fetch('/api/bots/bulk/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                        alert(data.message);
+                    }
+                });
+        }
+
+        function stopAllBots() {
+            fetch('/api/bots/bulk/stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshData();
+                        alert(data.message);
+                    }
+                });
+        }
+
+        function createRandomBot() {
+            fetch('/api/bots/create', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    refreshData();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function toggleCreateForm() {
+            createFormVisible = !createFormVisible;
+            document.getElementById('createBotForm').style.display = createFormVisible ? 'grid' : 'none';
+        }
+
+        function createCustomBot() {
+            const config = {
+                rate: parseFloat(document.getElementById('customRate').value),
+                attack_duration: parseInt(document.getElementById('customDuration').value),
+                target_url: `http://aurora-shield:8080${document.getElementById('customPath').value}`,
+                user_agent: document.getElementById('customUserAgent').value,
+                payload_size: parseInt(document.getElementById('customPayload').value)
+            };
+
+            fetch('/api/bots/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    attack_type: document.getElementById('attackType').value,
+                    config: config
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    refreshData();
+                    toggleCreateForm();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function exportLogs() {
+            const logs = {
+                timestamp: new Date().toISOString(),
+                bots: botsData,
+                statistics: {
+                    total_bots: botsData.length,
+                    active_bots: botsData.filter(b => b.status === 'active').length,
+                    total_requests: botsData.reduce((sum, b) => sum + b.total_requests, 0)
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `attack_orchestrator_logs_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

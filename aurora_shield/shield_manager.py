@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from aurora_shield.core.anomaly_detector import AnomalyDetector
 from aurora_shield.mitigation.rate_limiter import RateLimiter
+from aurora_shield.mitigation.advanced_limits import advanced_limiter
+from aurora_shield.mitigation.sinkhole import sinkhole_manager, start_sinkhole_cleanup_thread
 from aurora_shield.mitigation.ip_reputation import IPReputation
 from aurora_shield.mitigation.challenge_response import ChallengeResponse
 from aurora_shield.auto_recovery.recovery_manager import RecoveryManager
@@ -41,11 +43,16 @@ class AuroraShieldManager:
         self.elk_integration = ELKIntegration(self.config.get('elk'))
         self.prometheus_integration = PrometheusIntegration(self.config.get('prometheus'))
         
+        # Start sinkhole cleanup thread
+        start_sinkhole_cleanup_thread()
+        
         # Request tracking
         self.total_requests = 0
         self.blocked_requests = 0
         self.allowed_requests = 0
         self.rate_limited_requests = 0
+        self.sinkholed_requests = 0
+        self.blackholed_requests = 0
         self.start_time = time.time()
         
         # Real-time request monitoring
@@ -69,11 +76,67 @@ class AuroraShieldManager:
         """
         self.total_requests += 1
         ip_address = request_data.get('ip')
+        user_agent = request_data.get('user_agent', '')
+        fingerprint = request_data.get('fingerprint', '')
+        
+        # Layer 0: Sinkhole/Blackhole Check (highest priority)
+        sinkhole_check = sinkhole_manager.check_request(ip_address, fingerprint, user_agent)
+        
+        if sinkhole_check['action'] == 'blackhole':
+            self.blocked_requests += 1
+            self.blackholed_requests += 1
+            self.elk_integration.log_event('request_blackholed', {
+                'ip': ip_address,
+                'reason': sinkhole_check['reason']
+            })
+            self._log_request_realtime(request_data, 'blackholed', f"Blackholed: {sinkhole_check['reason']}")
+            return {
+                'allowed': False,
+                'reason': f"Blackholed: {sinkhole_check['reason']}",
+                'layer': 'blackhole',
+                'action': 'drop'
+            }
+        
+        if sinkhole_check['action'] == 'sinkhole':
+            self.sinkholed_requests += 1
+            self.elk_integration.log_event('request_sinkholed', {
+                'ip': ip_address,
+                'reason': sinkhole_check['reason'],
+                'response_type': sinkhole_check['response']['type']
+            })
+            self._log_request_realtime(request_data, 'sinkholed', f"Sinkholed: {sinkhole_check['reason']}")
+            return {
+                'allowed': False,
+                'reason': f"Sinkholed: {sinkhole_check['reason']}",
+                'layer': 'sinkhole',
+                'action': 'sinkhole',
+                'sinkhole_response': sinkhole_check['response']
+            }
+        
+        if sinkhole_check['action'] == 'quarantine':
+            self.blocked_requests += 1
+            self.elk_integration.log_event('request_quarantined', {
+                'ip': ip_address,
+                'reason': sinkhole_check['reason'],
+                'until': sinkhole_check['until']
+            })
+            self._log_request_realtime(request_data, 'quarantined', f"Quarantined: {sinkhole_check['reason']}")
+            return {
+                'allowed': False,
+                'reason': f"Quarantined: {sinkhole_check['reason']}",
+                'layer': 'quarantine',
+                'action': 'quarantine',
+                'quarantine_response': sinkhole_check['response']
+            }
         
         # Layer 1: IP Reputation Check
         reputation = self.ip_reputation.get_reputation(ip_address)
         if not reputation['allowed']:
             self.blocked_requests += 1
+            
+            # Record violation for potential sinkhole escalation
+            sinkhole_manager.process_violation(ip_address, 'ip_reputation', severity=reputation.get('severity', 5))
+            
             self.elk_integration.log_event('request_blocked', {
                 'ip': ip_address,
                 'reason': 'ip_reputation',
@@ -86,24 +149,70 @@ class AuroraShieldManager:
                 'layer': 'ip_reputation'
             }
         
-        # Layer 2: Rate Limiting
+        # Layer 2: Advanced Multi-Key Rate Limiting
+        advanced_check = advanced_limiter.check_request({
+            'ip': ip_address,
+            'user_agent': request_data.get('user_agent', ''),
+            'path': request_data.get('path', '/'),
+            'headers': request_data.get('headers', {}),
+            'timestamp': time.time()
+        })
+        
+        if not advanced_check[0]:  # advanced_check returns (allowed, reason, context)
+            self.blocked_requests += 1
+            self.rate_limited_requests += 1
+            
+            block_reason = advanced_check[1]
+            block_context = advanced_check[2]
+            
+            self.elk_integration.log_event('request_blocked', {
+                'ip': ip_address,
+                'reason': f'advanced_{block_reason}',
+                'context': block_context
+            })
+            
+            # Increase reputation violation based on block type and record for sinkhole
+            severity_map = {
+                'global_rate_limit': 3,
+                'ip_rate_limit': 5,
+                'subnet_rate_limit': 8,
+                'fingerprint_rate_limit': 10,
+                'suspicious_behavior': 15,
+                'fair_queue_delay': 2
+            }
+            severity = severity_map.get(block_reason, 5)
+            self.ip_reputation.record_violation(ip_address, f'advanced_{block_reason}', severity=severity)
+            
+            # Record violation for sinkhole escalation
+            sinkhole_manager.process_violation(ip_address, f'advanced_{block_reason}', severity=severity)
+            
+            self._log_request_realtime(request_data, 'rate-limited', f'Advanced limiting: {block_reason}')
+            
+            return {
+                'allowed': False,
+                'reason': f'Advanced rate limiting: {block_reason}',
+                'layer': 'advanced_rate_limiter',
+                'context': block_context
+            }
+        
+        # Layer 3: Basic Rate Limiting (backup/legacy)
         rate_check = self.rate_limiter.allow_request(ip_address)
         if not rate_check['allowed']:
             self.blocked_requests += 1
             self.rate_limited_requests += 1
             self.elk_integration.log_event('request_blocked', {
                 'ip': ip_address,
-                'reason': 'rate_limit'
+                'reason': 'basic_rate_limit'
             })
-            self.ip_reputation.record_violation(ip_address, 'rate_limit', severity=5)
-            self._log_request_realtime(request_data, 'rate-limited', 'Rate limit exceeded')
+            self.ip_reputation.record_violation(ip_address, 'basic_rate_limit', severity=5)
+            self._log_request_realtime(request_data, 'rate-limited', 'Basic rate limit exceeded')
             return {
                 'allowed': False,
-                'reason': 'Rate limit exceeded',
-                'layer': 'rate_limiter'
+                'reason': 'Basic rate limit exceeded',
+                'layer': 'basic_rate_limiter'
             }
         
-        # Layer 3: Anomaly Detection (Rule-Based)
+        # Layer 4: Anomaly Detection (Rule-Based)
         anomaly_check = self.anomaly_detector.check_request(ip_address)
         if not anomaly_check['allowed']:
             self.blocked_requests += 1
@@ -247,6 +356,107 @@ class AuroraShieldManager:
             'result': result
         }
     
+    def get_advanced_stats(self):
+        """Get comprehensive statistics including advanced rate limiter and sinkhole data."""
+        basic_stats = self.get_all_stats()
+        advanced_stats = advanced_limiter.get_statistics()
+        advanced_status = advanced_limiter.get_detailed_status()
+        sinkhole_stats = sinkhole_manager.get_statistics()
+        sinkhole_status = sinkhole_manager.get_detailed_status()
+        
+        # Calculate overall system metrics
+        uptime = time.time() - self.start_time
+        request_rate = self.total_requests / max(uptime, 1)
+        block_rate = self.blocked_requests / max(self.total_requests, 1) * 100
+        
+        return {
+            'overview': {
+                'uptime_seconds': int(uptime),
+                'total_requests': self.total_requests,
+                'allowed_requests': self.allowed_requests,
+                'blocked_requests': self.blocked_requests,
+                'sinkholed_requests': self.sinkholed_requests,
+                'blackholed_requests': self.blackholed_requests,
+                'request_rate': round(request_rate, 2),
+                'block_rate': round(block_rate, 2),
+                'system_health': self._calculate_system_health()
+            },
+            'basic_protection': basic_stats,
+            'advanced_protection': {
+                'statistics': advanced_stats,
+                'status': advanced_status,
+                'active_limits': {
+                    'per_ip': len([ip for ip, queue in advanced_limiter.per_ip_limits.items() if queue]),
+                    'per_subnet': len([subnet for subnet, queue in advanced_limiter.per_subnet_limits.items() if queue]),
+                    'per_fingerprint': len([fp for fp, queue in advanced_limiter.per_fingerprint_limits.items() if queue])
+                }
+            },
+            'sinkhole_protection': {
+                'statistics': sinkhole_stats,
+                'status': sinkhole_status,
+                'active_sinkholes': {
+                    'total_ips': sinkhole_stats['counts']['sinkholed_ips'],
+                    'total_subnets': sinkhole_stats['counts']['sinkholed_subnets'],
+                    'total_blackholed': sinkhole_stats['counts']['blackholed_ips'],
+                    'quarantined': sinkhole_stats['counts']['quarantined_ips']
+                }
+            },
+            'real_time': {
+                'requests_per_second': self.requests_per_second,
+                'recent_requests': self.recent_requests[-20:] if self.recent_requests else [],
+                'ip_activity': dict(list(self.ip_request_counts.items())[:10])  # Top 10 active IPs
+            },
+            'timestamp': time.time()
+        }
+    
+    def _calculate_system_health(self):
+        """Calculate overall system health score (0-100)."""
+        health_factors = []
+        
+        # Request processing health (errors vs success)
+        if self.total_requests > 0:
+            success_rate = (self.allowed_requests / self.total_requests) * 100
+            # Inverse block rate for health (more blocks = potential under attack)
+            block_rate = (self.blocked_requests / self.total_requests) * 100
+            
+            # Good blocking (protecting) vs overwhelming attacks
+            if block_rate < 50:  # Normal protective blocking
+                health_factors.append(min(100, success_rate + (block_rate * 0.5)))
+            else:  # High block rate indicates heavy attack
+                health_factors.append(max(50, 100 - (block_rate - 50)))
+        else:
+            health_factors.append(100)  # No traffic = healthy
+        
+        # Component availability health
+        try:
+            # Test each component briefly
+            component_health = 100
+            if not self.rate_limiter:
+                component_health -= 20
+            if not self.ip_reputation:
+                component_health -= 20
+            if not self.anomaly_detector:
+                component_health -= 20
+            
+            health_factors.append(component_health)
+        except:
+            health_factors.append(80)  # Some component issues
+        
+        # Memory/performance health (simplified)
+        try:
+            # Check if we're tracking too many IPs (memory concern)
+            active_ips = len(self.ip_request_counts)
+            if active_ips < 1000:
+                health_factors.append(100)
+            elif active_ips < 5000:
+                health_factors.append(80)
+            else:
+                health_factors.append(60)  # Heavy load
+        except:
+            health_factors.append(90)
+        
+        return round(sum(health_factors) / len(health_factors), 1)
+
     def get_stats(self):
         """Get simplified statistics for dashboard."""
         all_stats = self.get_all_stats()
@@ -254,7 +464,7 @@ class AuroraShieldManager:
             'requests_per_second': self.total_requests / max((time.time() - self.start_time), 1),
             'threats_blocked': self.blocked_requests,
             'active_connections': all_stats.get('monitored_ips', 0),
-            'system_health': 99.9,  # Could be calculated based on component status
+            'system_health': self._calculate_system_health(),
             'recent_attacks': []  # Could be retrieved from logs
         }
     

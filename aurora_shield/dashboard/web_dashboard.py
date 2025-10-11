@@ -213,6 +213,105 @@ class WebDashboard:
                 logger.error(f"Error simulating attack: {e}")
                 return jsonify({'error': 'Failed to simulate attack'}), 500
 
+        @self.app.route('/api/sinkhole/status')
+        def get_sinkhole_status():
+            """Get sinkhole/blackhole status"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                status = sinkhole_manager.get_detailed_status()
+                return jsonify({
+                    'success': True,
+                    'data': status,
+                    'timestamp': time.time()
+                })
+            except Exception as e:
+                logger.error(f"Error fetching sinkhole status: {e}")
+                return jsonify({'error': 'Failed to fetch sinkhole status'}), 500
+
+        @self.app.route('/api/sinkhole/add', methods=['POST'])
+        def add_to_sinkhole():
+            """Add IP/subnet/fingerprint to sinkhole"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                data = request.get_json()
+                
+                target = data.get('target', '').strip()
+                target_type = data.get('type', 'ip')
+                reason = data.get('reason', f'Dashboard action by {session.get("name", "unknown")}')
+                
+                if not target:
+                    return jsonify({'error': 'Target is required'}), 400
+                
+                sinkhole_manager.add_to_sinkhole(target, target_type, reason)
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Added {target} to sinkhole',
+                    'target': target,
+                    'type': target_type,
+                    'reason': reason
+                })
+                
+            except Exception as e:
+                logger.error(f"Error adding to sinkhole: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/blackhole/add', methods=['POST'])
+        def add_to_blackhole():
+            """Add IP/subnet to blackhole"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                data = request.get_json()
+                
+                target = data.get('target', '').strip()
+                target_type = data.get('type', 'ip')
+                reason = data.get('reason', f'Dashboard action by {session.get("name", "unknown")}')
+                
+                if not target:
+                    return jsonify({'error': 'Target is required'}), 400
+                
+                sinkhole_manager.add_to_blackhole(target, target_type, reason)
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Added {target} to blackhole',
+                    'target': target,
+                    'type': target_type,
+                    'reason': reason
+                })
+                
+            except Exception as e:
+                logger.error(f"Error adding to blackhole: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/advanced/stats')
+        def get_advanced_stats():
+            """Get comprehensive advanced statistics including sinkhole data"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                advanced_stats = self.shield_manager.get_advanced_stats()
+                return jsonify(advanced_stats)
+            except Exception as e:
+                logger.error(f"Error fetching advanced stats: {e}")
+                return jsonify({'error': 'Failed to fetch advanced statistics'}), 500
+
         @self.app.route('/api/dashboard/mitigation/<mitigation_type>', methods=['POST'])
         def toggle_mitigation(mitigation_type):
             """Toggle specific mitigation techniques."""

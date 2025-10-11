@@ -644,6 +644,182 @@
         .ip-score.suspicious { color: var(--warning); }
         .ip-score.malicious { color: var(--danger); }
 
+        /* Sinkhole Tab Styles */
+        .sinkhole-panel {
+            background: var(--panel);
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:24px;
+            margin-bottom:24px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        .sinkhole-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .sinkhole-stat-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .sinkhole-stat-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 4px 20px rgba(155, 124, 255, 0.15);
+        }
+
+        .sinkhole-form-section {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .sinkhole-form-section h3 {
+            color: var(--accent);
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #dbe6ff;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(155, 124, 255, 0.2);
+        }
+
+        .action-btn {
+            background: linear-gradient(145deg, var(--accent), #8b6bff);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(155, 124, 255, 0.3);
+        }
+
+        .action-btn.danger {
+            background: linear-gradient(145deg, var(--danger), #e63946);
+        }
+
+        .action-btn.danger:hover {
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+        }
+
+        .sinkhole-list-section,
+        .blackhole-list-section {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .sinkhole-list-section h3,
+        .blackhole-list-section h3 {
+            color: var(--accent-2);
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .sinkhole-list,
+        .blackhole-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sinkhole-entry,
+        .blackhole-entry {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .entry-info {
+            flex: 1;
+        }
+
+        .entry-target {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .entry-reason {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .entry-time {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .remove-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .remove-btn:hover {
+            background: #e63946;
+        }
+
+        .no-data {
+            text-align: center;
+            color: var(--muted);
+            padding: 20px;
+            font-style: italic;
+        }
+
         /* Responsive */
         @media (max-width:768px){ 
             .stats-grid{ grid-template-columns: repeat(2,1fr); } 
@@ -708,6 +884,7 @@
         <div class="tab-navigation">
             <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
             <button class="tab-btn" onclick="switchTab('mitigation')">🛡️ Mitigation</button>
+            <button class="tab-btn" onclick="switchTab('sinkhole')">🕳️ Sinkhole</button>
             <button class="tab-btn" onclick="switchTab('live-requests')">🔴 Live Requests</button>
             <button class="tab-btn" onclick="switchTab('monitoring')">📡 Monitoring</button>
             <button class="tab-btn" onclick="switchTab('config')">⚙️ Configuration</button>
@@ -795,6 +972,74 @@
                             Activate maximum protection during severe attacks
                         </div>
                         <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sinkhole Tab -->
+        <div id="sinkhole-tab" class="tab-content">
+            <div class="sinkhole-panel">
+                <div class="panel-title">🕳️ Sinkhole/Blackhole Management</div>
+                
+                <!-- Sinkhole Status -->
+                <div class="sinkhole-status-grid">
+                    <div class="sinkhole-stat-card">
+                        <div class="stat-value" id="sinkholed-ips">0</div>
+                        <div class="stat-label">Sinkholed IPs</div>
+                    </div>
+                    <div class="sinkhole-stat-card">
+                        <div class="stat-value" id="blackholed-ips">0</div>
+                        <div class="stat-label">Blackholed IPs</div>
+                    </div>
+                    <div class="sinkhole-stat-card">
+                        <div class="stat-value" id="blocked-requests">0</div>
+                        <div class="stat-label">Blocked Requests</div>
+                    </div>
+                    <div class="sinkhole-stat-card">
+                        <div class="stat-value" id="sinkhole-efficiency">99.9%</div>
+                        <div class="stat-label">Efficiency</div>
+                    </div>
+                </div>
+
+                <!-- Add to Sinkhole Form -->
+                <div class="sinkhole-form-section">
+                    <h3>Add to Sinkhole</h3>
+                    <div class="form-group">
+                        <label for="target-input">Target (IP/Subnet/Fingerprint):</label>
+                        <input type="text" id="target-input" placeholder="e.g., 192.168.1.100, 10.0.0.0/8, or fingerprint:abc123">
+                    </div>
+                    <div class="form-group">
+                        <label for="target-type">Type:</label>
+                        <select id="target-type">
+                            <option value="ip">IP Address</option>
+                            <option value="subnet">Subnet/CIDR</option>
+                            <option value="fingerprint">Fingerprint</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reason-input">Reason:</label>
+                        <input type="text" id="reason-input" placeholder="e.g., DDoS attack, suspicious activity">
+                    </div>
+                    <button onclick="addToSinkhole()" class="action-btn">Add to Sinkhole</button>
+                    <button onclick="addToBlackhole()" class="action-btn danger">Add to Blackhole</button>
+                </div>
+
+                <!-- Sinkhole List -->
+                <div class="sinkhole-list-section">
+                    <h3>Active Sinkhole Entries</h3>
+                    <div id="sinkhole-list" class="sinkhole-list">
+                        <!-- Dynamic content will be loaded here -->
+                        <div class="no-data">No sinkhole entries yet</div>
+                    </div>
+                </div>
+
+                <!-- Blackhole List -->
+                <div class="blackhole-list-section">
+                    <h3>Active Blackhole Entries</h3>
+                    <div id="blackhole-list" class="blackhole-list">
+                        <!-- Dynamic content will be loaded here -->
+                        <div class="no-data">No blackhole entries yet</div>
                     </div>
                 </div>
             </div>
@@ -1487,9 +1732,202 @@
         }
 
         // Initialize dashboard
+        // Sinkhole management functions
+        function addToSinkhole() {
+            const target = document.getElementById('target-input').value.trim();
+            const type = document.getElementById('target-type').value;
+            const reason = document.getElementById('reason-input').value.trim() || 'Manual addition';
+
+            if (!target) {
+                alert('Please enter a target');
+                return;
+            }
+
+            const data = {
+                target: target,
+                type: type,
+                reason: reason
+            };
+
+            fetch('/api/sinkhole/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Successfully added to sinkhole: ' + target);
+                    clearSinkholeForm();
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function addToBlackhole() {
+            const target = document.getElementById('target-input').value.trim();
+            const reason = document.getElementById('reason-input').value.trim() || 'Manual blackhole';
+
+            if (!target) {
+                alert('Please enter a target');
+                return;
+            }
+
+            const data = {
+                target: target,
+                reason: reason
+            };
+
+            fetch('/api/blackhole/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Successfully added to blackhole: ' + target);
+                    clearSinkholeForm();
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function clearSinkholeForm() {
+            document.getElementById('target-input').value = '';
+            document.getElementById('reason-input').value = '';
+            document.getElementById('target-type').value = 'ip';
+        }
+
+        function loadSinkholeData() {
+            fetch('/api/sinkhole/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateSinkholeStats(data.data);
+                        updateSinkholeList(data.data.sinkhole_entries || []);
+                        updateBlackholeList(data.data.blackhole_entries || []);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sinkhole data:', error);
+                });
+        }
+
+        function updateSinkholeStats(data) {
+            document.getElementById('sinkholed-ips').textContent = data.sinkhole_count || 0;
+            document.getElementById('blackholed-ips').textContent = data.blackhole_count || 0;
+            document.getElementById('blocked-requests').textContent = data.blocked_requests || 0;
+            document.getElementById('sinkhole-efficiency').textContent = (data.efficiency || 99.9) + '%';
+        }
+
+        function updateSinkholeList(entries) {
+            const container = document.getElementById('sinkhole-list');
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="no-data">No sinkhole entries yet</div>';
+                return;
+            }
+
+            container.innerHTML = entries.map(entry => `
+                <div class="sinkhole-entry">
+                    <div class="entry-info">
+                        <div class="entry-target">${entry.target}</div>
+                        <div class="entry-reason">${entry.reason}</div>
+                        <div class="entry-time">${new Date(entry.timestamp * 1000).toLocaleString()}</div>
+                    </div>
+                    <button class="remove-btn" onclick="removeFromSinkhole('${entry.target}')">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function updateBlackholeList(entries) {
+            const container = document.getElementById('blackhole-list');
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="no-data">No blackhole entries yet</div>';
+                return;
+            }
+
+            container.innerHTML = entries.map(entry => `
+                <div class="blackhole-entry">
+                    <div class="entry-info">
+                        <div class="entry-target">${entry.target}</div>
+                        <div class="entry-reason">${entry.reason}</div>
+                        <div class="entry-time">${new Date(entry.timestamp * 1000).toLocaleString()}</div>
+                    </div>
+                    <button class="remove-btn" onclick="removeFromBlackhole('${entry.target}')">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function removeFromSinkhole(target) {
+            if (!confirm('Remove ' + target + ' from sinkhole?')) return;
+
+            fetch('/api/sinkhole/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ target: target })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function removeFromBlackhole(target) {
+            if (!confirm('Remove ' + target + ' from blackhole?')) return;
+
+            fetch('/api/blackhole/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ target: target })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             {% if current_user %}
             startAutoRefresh();
+            // Load sinkhole data when page loads
+            loadSinkholeData();
             {% endif %}
         });
     </script>
