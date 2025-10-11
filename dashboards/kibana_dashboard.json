@@ -1,0 +1,81 @@
+{
+  "title": "Aurora Shield - DDoS Protection Dashboard",
+  "description": "Real-time monitoring of DDoS attacks and protection metrics",
+  "panels": [
+    {
+      "id": "1",
+      "title": "Attack Timeline",
+      "type": "line",
+      "query": {
+        "index": "aurora-shield-*",
+        "filter": {
+          "event_type": "ddos_attack"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "title": "Top Attacking IPs",
+      "type": "table",
+      "query": {
+        "index": "aurora-shield-*",
+        "aggregation": {
+          "field": "data.ip",
+          "size": 10
+        }
+      }
+    },
+    {
+      "id": "3",
+      "title": "Attack Types Distribution",
+      "type": "pie",
+      "query": {
+        "index": "aurora-shield-*",
+        "aggregation": {
+          "field": "data.type"
+        }
+      }
+    },
+    {
+      "id": "4",
+      "title": "Mitigation Actions",
+      "type": "bar",
+      "query": {
+        "index": "aurora-shield-*",
+        "filter": {
+          "event_type": "mitigation_action"
+        }
+      }
+    },
+    {
+      "id": "5",
+      "title": "Request Rate",
+      "type": "metric",
+      "query": {
+        "index": "aurora-shield-*",
+        "metric": "count",
+        "interval": "1m"
+      }
+    },
+    {
+      "id": "6",
+      "title": "Blocked vs Allowed Requests",
+      "type": "area",
+      "query": {
+        "index": "aurora-shield-*",
+        "series": [
+          {
+            "name": "Blocked",
+            "filter": "data.allowed:false"
+          },
+          {
+            "name": "Allowed",
+            "filter": "data.allowed:true"
+          }
+        ]
+      }
+    }
+  ],
+  "refresh": "5s",
+  "time_range": "last_15_minutes"
+}
