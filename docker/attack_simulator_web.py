@@ -30,6 +30,21 @@ class AttackSimulator:
         self.aurora_url = f"http://{self.target_host}:{self.target_port}"
         self.lb_url = f"http://{self.lb_host}:{self.lb_port}"
         
+        # Assign static IP based on simulator instance
+        simulator_port = os.getenv('SIMULATOR_PORT', '5001')
+        if simulator_port == '5001':
+            self.static_ip = '10.0.1.100'  # Simulator 1
+            self.simulator_name = 'Simulator-1'
+        elif simulator_port == '5002':
+            self.static_ip = '10.0.1.101'  # Simulator 2  
+            self.simulator_name = 'Simulator-2'
+        elif simulator_port == '5003':
+            self.static_ip = '10.0.1.102'  # Simulator 3
+            self.simulator_name = 'Simulator-3'
+        else:
+            self.static_ip = f'10.0.1.{random.randint(200, 250)}'  # Fallback
+            self.simulator_name = 'Simulator-Unknown'
+        
         # Attack state management
         self.active_attacks = {}
         self.attack_results = queue.Queue()
@@ -105,9 +120,10 @@ class AttackSimulator:
                         # Use POST for Aurora Shield authorization endpoint
                         if target == 'aurora' and endpoint == '/api/shield/check-request':
                             headers = {
-                                'X-Original-IP': f'192.168.1.{random.randint(1, 254)}',
+                                'X-Original-IP': self.static_ip,  # Use static IP for this simulator
                                 'X-Original-URI': f'/attack/{random.randint(1, 1000)}',
-                                'User-Agent': f'AttackBot/{random.randint(1, 10)}'
+                                'User-Agent': f'{self.simulator_name}-Bot/{random.randint(1, 10)}',
+                                'X-Simulator-Name': self.simulator_name
                             }
                             response = requests.post(f"{url}{endpoint}", headers=headers, timeout=2)
                         else:
@@ -228,8 +244,9 @@ class AttackSimulator:
                     # Use POST for Aurora Shield authorization endpoint
                     if target == 'aurora' and endpoint == '/api/shield/check-request':
                         headers.update({
-                            'X-Original-IP': f'192.168.1.{random.randint(1, 254)}',
-                            'X-Original-URI': f'/test/{random.randint(1, 1000)}'
+                            'X-Original-IP': self.static_ip,  # Use static IP for this simulator
+                            'X-Original-URI': f'/test/{random.randint(1, 1000)}',
+                            'X-Simulator-Name': self.simulator_name
                         })
                         response = requests.post(f"{url}{endpoint}", 
                                               headers=headers, timeout=5)
@@ -245,7 +262,8 @@ class AttackSimulator:
                 except Exception as e:
                     self.log_request(success=False)
                 
-                time.sleep(60 / rate)  # Maintain specified rate
+                # Calculate correct sleep time for the specified rate
+                time.sleep(1.0 / rate)  # Sleep for 1/rate seconds to maintain rate requests per second
             
             del self.active_attacks[attack_id]
             print(f"✅ Normal Traffic completed: {request_count} requests")
