@@ -412,6 +412,7 @@
                 <div class="form-group">
                     <label>Attack Type</label>
                     <select id="attackType">
+                        <option value="normal">Normal (Legitimate Traffic)</option>
                         <option value="http_flood">HTTP Flood</option>
                         <option value="ddos_burst">DDoS Burst</option>
                         <option value="slowloris">Slowloris</option>
@@ -892,16 +893,70 @@
 
         function resetForm() {
             document.getElementById('botCount').value = '1';
-            document.getElementById('attackType').value = 'http_flood';
-            document.getElementById('customRate').value = '10';
-            document.getElementById('customDuration').value = '60';
-            document.getElementById('customTarget').value = 'http://localhost:8080';
-            document.getElementById('customPath').value = '/api/test';
-            document.getElementById('customUserAgent').value = 'CustomBot/1.0';
-            document.getElementById('customPayload').value = '1000';
-            document.getElementById('customConnections').value = '10';
-            document.getElementById('randomizeHeaders').checked = false;
+            document.getElementById('attackType').value = 'normal';  // Default to normal traffic
+            adjustFormDefaults('normal');  // Set appropriate defaults
         }
+
+        // Adjust form defaults based on attack type
+        function adjustFormDefaults(attackType) {
+            const rateInput = document.getElementById('customRate');
+            const durationInput = document.getElementById('customDuration');
+            const targetInput = document.getElementById('customTarget');
+            const pathInput = document.getElementById('customPath');
+            const userAgentInput = document.getElementById('customUserAgent');
+            const payloadInput = document.getElementById('customPayload');
+            const connectionsInput = document.getElementById('customConnections');
+
+            if (attackType === 'normal') {
+                // Legitimate traffic defaults
+                rateInput.value = '1';
+                durationInput.value = '300';
+                targetInput.value = 'http://load-balancer:8090';
+                pathInput.value = '/';
+                userAgentInput.value = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+                payloadInput.value = '100';
+                connectionsInput.value = '1';
+            } else if (attackType === 'brute_force') {
+                // Brute force defaults
+                rateInput.value = '5';
+                durationInput.value = '120';
+                targetInput.value = 'http://load-balancer:8090';
+                pathInput.value = '/login';
+                userAgentInput.value = 'BruteForce/1.0';
+                payloadInput.value = '300';
+                connectionsInput.value = '3';
+            } else if (attackType === 'slowloris') {
+                // Slowloris defaults
+                rateInput.value = '0.5';
+                durationInput.value = '180';
+                targetInput.value = 'http://load-balancer:8090';
+                pathInput.value = '/admin';
+                userAgentInput.value = 'SlowClient/1.0';
+                payloadInput.value = '50';
+                connectionsInput.value = '20';
+            } else {
+                // Default attack settings
+                rateInput.value = '10';
+                durationInput.value = '60';
+                targetInput.value = 'http://load-balancer:8090';
+                pathInput.value = '/api/test';
+                userAgentInput.value = 'AttackBot/1.0';
+                payloadInput.value = '1000';
+                connectionsInput.value = '10';
+            }
+        }
+
+        // Add event listener for attack type changes
+        document.addEventListener('DOMContentLoaded', function() {
+            const attackTypeSelect = document.getElementById('attackType');
+            if (attackTypeSelect) {
+                attackTypeSelect.addEventListener('change', function() {
+                    adjustFormDefaults(this.value);
+                });
+                // Set initial defaults
+                adjustFormDefaults('normal');
+            }
+        });
 
         // Tab Management
         function switchTab(tabName) {
