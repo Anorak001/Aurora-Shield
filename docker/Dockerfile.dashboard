@@ -1,0 +1,37 @@
+# Service Dashboard
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install flask requests gunicorn docker
+
+# Copy dashboard application
+COPY service_dashboard.py /app/app.py
+COPY templates/ /app/templates/
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Set environment variables
+ENV FLASK_ENV=production
+ENV PYTHONPATH=/app
+
+# Expose port 5000
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Create non-root user
+RUN useradd -m -u 1000 dashboard && chown -R dashboard:dashboard /app
+USER dashboard
+
+# Start the dashboard
+CMD ["python", "app.py"]
