@@ -1174,6 +1174,50 @@ def catch_all_protected(path):
             'path': full_path
         }), 503
 
+@app.route('/api/reset-stats', methods=['POST'])
+def reset_stats():
+    """Reset all load balancer statistics to zero."""
+    global stats
+    logger.info("Resetting load balancer statistics")
+    
+    # Reset all stats to initial values
+    stats = {
+        'requests_total': 0,
+        'requests_by_cdn': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'requests_allowed': 0,
+        'requests_blocked': 0,
+        'errors': 0,
+        'cdn_failures': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'start_time': datetime.now(),
+        'last_request_time': None
+    }
+    
+    logger.info("Load balancer statistics reset successfully")
+    return jsonify({
+        'message': 'Statistics reset successfully',
+        'timestamp': datetime.now().isoformat(),
+        'stats': stats
+    })
+
+def initialize_stats():
+    """Initialize or reset statistics at startup."""
+    global stats
+    logger.info("Initializing load balancer statistics")
+    
+    stats = {
+        'requests_total': 0,
+        'requests_by_cdn': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'requests_allowed': 0,
+        'requests_blocked': 0,
+        'errors': 0,
+        'cdn_failures': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'start_time': datetime.now(),
+        'last_request_time': None
+    }
+    logger.info("Load balancer statistics initialized successfully")
+
 if __name__ == '__main__':
+    # Initialize stats on startup
+    initialize_stats()
     logger.info("Starting Aurora Shield Load Balancer on port 8090")
     app.run(host='0.0.0.0', port=8090, debug=False)

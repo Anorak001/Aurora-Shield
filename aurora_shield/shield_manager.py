@@ -74,6 +74,9 @@ class AuroraShieldManager:
         Returns:
             dict: Decision with allowed status and details
         """
+        # DEBUG: Log every request to verify code execution
+        logger.info(f"SHIELD_DEBUG: Processing request from {request_data.get('ip')} - Total reputation scores tracked: {len(self.ip_reputation.reputation_scores)}")
+        
         self.total_requests += 1
         ip_address = request_data.get('ip')
         user_agent = request_data.get('user_agent', '')
@@ -85,6 +88,10 @@ class AuroraShieldManager:
         if sinkhole_check['action'] == 'blackhole':
             self.blocked_requests += 1
             self.blackholed_requests += 1
+            
+            # Record IP reputation violation for blackholed requests
+            self.ip_reputation.record_violation(ip_address, 'blackholed_request', severity=30)
+            
             self.elk_integration.log_event('request_blackholed', {
                 'ip': ip_address,
                 'reason': sinkhole_check['reason']
@@ -99,6 +106,10 @@ class AuroraShieldManager:
         
         if sinkhole_check['action'] == 'sinkhole':
             self.sinkholed_requests += 1
+            
+            # Record IP reputation violation for sinkholed requests
+            self.ip_reputation.record_violation(ip_address, 'sinkholed_request', severity=15)
+            
             self.elk_integration.log_event('request_sinkholed', {
                 'ip': ip_address,
                 'reason': sinkhole_check['reason'],
@@ -115,6 +126,10 @@ class AuroraShieldManager:
         
         if sinkhole_check['action'] == 'quarantine':
             self.blocked_requests += 1
+            
+            # Record IP reputation violation for quarantined requests  
+            self.ip_reputation.record_violation(ip_address, 'quarantined_request', severity=25)
+            
             self.elk_integration.log_event('request_quarantined', {
                 'ip': ip_address,
                 'reason': sinkhole_check['reason'],
@@ -522,3 +537,17 @@ class AuroraShieldManager:
         self.blocked_requests = 0
         self.start_time = time.time()
         logger.info("Reset complete")
+    
+    def debug_print_reputation_scores(self):
+        """Debug method to print current reputation scores."""
+        logger.info("=== DEBUG: Current IP Reputation Scores ===")
+        if hasattr(self, 'ip_reputation') and self.ip_reputation:
+            scores = self.ip_reputation.reputation_scores
+            logger.info(f"Total tracked IPs: {len(scores)}")
+            for ip, score in scores.items():
+                violations = len(self.ip_reputation.violation_history.get(ip, []))
+                logger.info(f"IP {ip}: Score={score}, Violations={violations}")
+        else:
+            logger.info("IP Reputation system not available")
+        logger.info("=== END DEBUG REPUTATION SCORES ===")
+        return len(self.ip_reputation.reputation_scores) if hasattr(self, 'ip_reputation') and self.ip_reputation else 0

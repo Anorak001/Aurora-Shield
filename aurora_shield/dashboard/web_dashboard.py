@@ -388,7 +388,7 @@ class WebDashboard:
                 limit = int(request.args.get('limit', 20))
                 
                 # Fetch real attack data from attack orchestrator
-                attack_orchestrator_url = "http://attack-orchestrator:5003"
+                attack_orchestrator_url = "http://attack-orchestrator:5000"
                 recent_attacks = []
                 
                 try:
@@ -609,6 +609,32 @@ class WebDashboard:
                 logger.error(f"Error toggling mitigation {mitigation_type}: {e}")
                 return jsonify({'error': f'Failed to toggle {mitigation_type}'}), 500
 
+        @self.app.route('/api/dashboard/reset-stats', methods=['POST'])
+        def reset_load_balancer_stats():
+            """Reset load balancer statistics."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # Call the load balancer's reset stats endpoint
+                import requests
+                response = requests.post('http://load-balancer:8090/api/reset-stats', timeout=5)
+                
+                if response.status_code == 200:
+                    logger.info("Load balancer statistics reset successfully")
+                    return jsonify({
+                        'success': True,
+                        'message': 'Load balancer statistics reset successfully',
+                        'timestamp': response.json().get('timestamp')
+                    })
+                else:
+                    logger.error(f"Failed to reset load balancer stats: {response.status_code}")
+                    return jsonify({'error': 'Failed to reset load balancer statistics'}), 500
+                    
+            except Exception as e:
+                logger.error(f"Error resetting load balancer stats: {e}")
+                return jsonify({'error': f'Failed to reset statistics: {str(e)}'}), 500
+
         @self.app.route('/api/dashboard/config')
         def get_config():
             """Get current configuration with real values from shield manager."""
@@ -718,6 +744,33 @@ class WebDashboard:
                 'timestamp': datetime.now().isoformat(),
                 'version': '2.0.0'
             })
+
+        @self.app.route('/api/debug/reputation')
+        def debug_reputation_scores():
+            """Debug endpoint to get current IP reputation scores."""
+            try:
+                # Call the debug method to log reputation scores
+                tracked_count = self.shield_manager.debug_print_reputation_scores()
+                
+                # Also return the data in JSON format
+                reputation_data = {}
+                if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
+                    for ip, score in self.shield_manager.ip_reputation.reputation_scores.items():
+                        violations = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
+                        reputation_data[ip] = {
+                            'score': score,
+                            'violations': violations
+                        }
+                
+                return jsonify({
+                    'success': True,
+                    'tracked_ips': tracked_count,
+                    'reputation_scores': reputation_data,
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Error in debug reputation endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
 
     def _get_uptime(self):
         """Get system uptime in a human-readable format."""
