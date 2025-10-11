@@ -1,180 +1,166 @@
+version: '3.8'
+
 services:
   # Aurora Shield Main Application
   aurora-shield:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: as_aurora-shield
     ports:
       - "8080:8080"
     environment:
-      - AURORA_ENV=docker-demo
-      - PYTHONPATH=/app
-      - ELK_ENDPOINT=http://elasticsearch:9200
-      - PROMETHEUS_ENDPOINT=http://prometheus:9090
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+    networks:
+      - aurora-net
+    depends_on:
+      - elasticsearch
+      - prometheus
+    restart: unless-stopped
+
+  # Load Balancer
+  load-balancer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.loadbalancer
+    container_name: as_load-balancer
+    ports:
+      - "8090:8090"
+    environment:
+      - FLASK_ENV=production
     volumes:
       - ./logs:/app/logs
     networks:
       - aurora-net
     depends_on:
-      - elasticsearch
-      - prometheus
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Simulated Web Application (Protected by Aurora Shield)
-  demo-webapp:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./docker/demo-app:/usr/share/nginx/html
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf
-    networks:
-      - aurora-net
-    restart: unless-stopped
-
-  # Second CDN Service (CDN-West)
-  demo-webapp-cdn2:
-    image: nginx:alpine
-    ports:
-      - "8081:80"
-    volumes:
-      - ./docker/demo-app:/usr/share/nginx/html
-      - ./docker/nginx-cdn2.conf:/etc/nginx/conf.d/default.conf
-    networks:
-      - aurora-net
-    restart: unless-stopped
-
-  # Third CDN Service (CDN-Europe)
-  demo-webapp-cdn3:
-    image: nginx:alpine
-    ports:
-      - "8082:80"
-    volumes:
-      - ./docker/demo-app:/usr/share/nginx/html
-      - ./docker/nginx-cdn3.conf:/etc/nginx/conf.d/default.conf
-    networks:
-      - aurora-net
-    restart: unless-stopped
-
-  # Load Balancer (Entry Point)
-  load-balancer:
-    image: nginx:alpine
-    ports:
-      - "8090:80"
-    volumes:
-      - ./docker/lb-ui-nginx.conf:/etc/nginx/nginx.conf
-      - ./templates/load_balancer.html:/usr/share/nginx/html/load_balancer.html
-      - ./templates/load_balancer.html:/usr/share/nginx/html/index.html
-    depends_on:
       - demo-webapp
       - demo-webapp-cdn2
       - demo-webapp-cdn3
-    networks:
-      - aurora-net
     restart: unless-stopped
 
-  # Elasticsearch for Log Storage
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+  # Primary CDN Service
+  demo-webapp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp
+    ports:
+      - "80:5000"
     environment:
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
+      - FLASK_ENV=production
+      - CDN_NAME=Primary CDN
     volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./logs:/app/logs
     networks:
       - aurora-net
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
-  # Kibana for Log Visualization
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.0
+  # Secondary CDN Service
+  demo-webapp-cdn2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp-cdn2
     ports:
-      - "5601:5601"
+      - "8081:5000"
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - SERVER_NAME=kibana
-    depends_on:
-      - elasticsearch
-    networks:
-      - aurora-net
-    restart: unless-stopped
-
-  # Prometheus for Metrics Collection
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
+      - FLASK_ENV=production
+      - CDN_NAME=Secondary CDN
     volumes:
-      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - ./logs:/app/logs
     networks:
       - aurora-net
     restart: unless-stopped
 
-  # Grafana for Advanced Visualization
-  grafana:
-    image: grafana/grafana:latest
+  # Tertiary CDN Service
+  demo-webapp-cdn3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp-cdn3
     ports:
-      - "3000:3000"
+      - "8082:5000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
+      - FLASK_ENV=production
+      - CDN_NAME=Tertiary CDN
     volumes:
-      - grafana-data:/var/lib/grafana
-      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
+      - ./logs:/app/logs
     networks:
       - aurora-net
     restart: unless-stopped
 
-  # Redis for Caching and Session Storage
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - aurora-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Client Simulator Web Interface (Always Running)
+  # Attack Simulator Client 1
   client:
-    image: as-client
     build:
       context: .
       dockerfile: docker/Dockerfile.client
+    container_name: as_client_1
     ports:
       - "5001:5001"
     environment:
-      - TARGET_HOST=aurora-shield
-      - TARGET_PORT=8080
-      - LB_HOST=load-balancer
-      - LB_PORT=80
+      - FLASK_ENV=production
+      - CLIENT_ID=1
+      - CLIENT_NAME=Attack Simulator 1
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Attack Simulator Client 2
+  client-2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+    image: as-client-2
+    container_name: as_client_2
+    ports:
+      - "5002:5001"
+    environment:
+      - FLASK_ENV=production
+      - CLIENT_ID=2
+      - CLIENT_NAME=Attack Simulator 2
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Attack Simulator Client 3
+  client-3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+    image: as-client-3
+    container_name: as_client_3
+    ports:
+      - "5003:5001"
+    environment:
+      - FLASK_ENV=production
+      - CLIENT_ID=3
+      - CLIENT_NAME=Attack Simulator 3
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Service Dashboard
+  service-dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: as_service-dashboard
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./logs:/app/logs
     networks:
       - aurora-net
     depends_on:
@@ -182,13 +168,70 @@ services:
       - load-balancer
     restart: unless-stopped
 
-networks:
-  aurora-net:
-    name: as_aurora-net
-    external: true
+  # Elasticsearch for log aggregation
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: as_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.0
+    container_name: as_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: as_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: as_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - aurora-net
+    restart: unless-stopped
 
 volumes:
-  elasticsearch-data:
-  prometheus-data:
-  grafana-data:
-  redis-data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aurora-net:
+    external: true
