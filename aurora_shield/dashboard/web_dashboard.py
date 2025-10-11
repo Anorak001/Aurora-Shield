@@ -473,25 +473,61 @@ class WebDashboard:
 
         @self.app.route('/api/dashboard/config')
         def get_config():
-            """Export current configuration."""
+            """Get current configuration with real values from shield manager."""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
             
             try:
+                from aurora_shield.config.default_config import DEFAULT_CONFIG
+                
+                # Get current configuration from shield manager
+                current_config = getattr(self.shield_manager, 'config', DEFAULT_CONFIG)
+                
                 config = {
                     'version': '2.0.0',
                     'protection_enabled': True,
-                    'mitigations': {
-                        'rate_limiting': {'enabled': True, 'threshold': 100},
-                        'challenge_response': {'enabled': True, 'difficulty': 'medium'},
-                        'ip_reputation': {'enabled': True, 'strict_mode': False},
-                        'bot_detection': {'enabled': True, 'sensitivity': 'high'},
-                        'adaptive_learning': {'enabled': True, 'learning_rate': 0.01}
+                    'rate_limiter': {
+                        'enabled': True,
+                        'rate': current_config.get('rate_limiter', {}).get('rate', 10),
+                        'burst': current_config.get('rate_limiter', {}).get('burst', 20),
+                        'window_size': current_config.get('rate_limiter', {}).get('window_size', 60)
+                    },
+                    'anomaly_detector': {
+                        'enabled': True,
+                        'request_window': current_config.get('anomaly_detector', {}).get('request_window', 60),
+                        'rate_threshold': current_config.get('anomaly_detector', {}).get('rate_threshold', 100),
+                        'sensitivity': current_config.get('anomaly_detector', {}).get('sensitivity', 'medium')
+                    },
+                    'ip_reputation': {
+                        'enabled': True,
+                        'initial_score': current_config.get('ip_reputation', {}).get('initial_score', 100),
+                        'reputation_threshold': current_config.get('ip_reputation', {}).get('reputation_threshold', 50),
+                        'decay_rate': current_config.get('ip_reputation', {}).get('decay_rate', 0.1)
+                    },
+                    'challenge_response': {
+                        'enabled': True,
+                        'challenge_timeout': current_config.get('challenge_response', {}).get('challenge_timeout', 300),
+                        'difficulty': current_config.get('challenge_response', {}).get('difficulty', 'medium'),
+                        'max_attempts': current_config.get('challenge_response', {}).get('max_attempts', 3)
+                    },
+                    'sinkhole': {
+                        'enabled': True,
+                        'auto_sinkhole_enabled': True,
+                        'zero_reputation_threshold': 0,
+                        'queue_fairness_enabled': True,
+                        'queue_max_size': 1000
                     },
                     'thresholds': {
                         'requests_per_second': 1000,
                         'connection_limit': 10000,
-                        'response_time_limit': 5000
+                        'response_time_limit': 5000,
+                        'cpu_threshold': 80,
+                        'memory_threshold': 85
+                    },
+                    'dashboard': {
+                        'host': current_config.get('dashboard', {}).get('host', '0.0.0.0'),
+                        'port': current_config.get('dashboard', {}).get('port', 8080),
+                        'refresh_interval': 5
                     },
                     'exported_at': datetime.now().isoformat()
                 }
@@ -499,8 +535,42 @@ class WebDashboard:
                 return jsonify(config)
                 
             except Exception as e:
-                logger.error(f"Error exporting config: {e}")
-                return jsonify({'error': 'Failed to export configuration'}), 500
+                logger.error(f"Error getting config: {e}")
+                return jsonify({'error': 'Failed to get configuration'}), 500
+
+        @self.app.route('/api/dashboard/config', methods=['POST'])
+        def update_config():
+            """Update configuration parameters."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                config_updates = request.get_json()
+                if not config_updates:
+                    return jsonify({'error': 'No configuration data provided'}), 400
+                
+                # Validate and apply configuration updates
+                validation_result = self._validate_config_updates(config_updates)
+                if not validation_result['valid']:
+                    return jsonify({'error': validation_result['error']}), 400
+                
+                # Apply configuration to shield manager
+                self._apply_config_updates(config_updates)
+                
+                logger.info(f"Configuration updated by {session.get('user_id', 'unknown')}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Configuration updated successfully',
+                    'updated_at': datetime.now().isoformat()
+                })
+                
+            except Exception as e:
+                logger.error(f"Error updating config: {e}")
+                return jsonify({'error': 'Failed to update configuration'}), 500
 
         @self.app.route('/health')
         def health_check():
@@ -620,6 +690,109 @@ class WebDashboard:
                 'ip_request_counts': {},
                 'ip_reputation_data': {}
             }
+
+    def _validate_config_updates(self, config_updates):
+        """Validate configuration updates."""
+        try:
+            # Define validation rules
+            validation_rules = {
+                'rate_limiter': {
+                    'rate': {'type': (int, float), 'min': 1, 'max': 10000},
+                    'burst': {'type': (int, float), 'min': 1, 'max': 1000},
+                    'window_size': {'type': int, 'min': 1, 'max': 3600}
+                },
+                'anomaly_detector': {
+                    'request_window': {'type': int, 'min': 1, 'max': 3600},
+                    'rate_threshold': {'type': int, 'min': 1, 'max': 100000},
+                    'sensitivity': {'type': str, 'choices': ['low', 'medium', 'high']}
+                },
+                'ip_reputation': {
+                    'initial_score': {'type': int, 'min': 0, 'max': 100},
+                    'reputation_threshold': {'type': int, 'min': 0, 'max': 100},
+                    'decay_rate': {'type': (int, float), 'min': 0, 'max': 1}
+                },
+                'challenge_response': {
+                    'challenge_timeout': {'type': int, 'min': 10, 'max': 3600},
+                    'difficulty': {'type': str, 'choices': ['easy', 'medium', 'hard']},
+                    'max_attempts': {'type': int, 'min': 1, 'max': 10}
+                },
+                'thresholds': {
+                    'requests_per_second': {'type': int, 'min': 10, 'max': 100000},
+                    'connection_limit': {'type': int, 'min': 10, 'max': 1000000},
+                    'response_time_limit': {'type': int, 'min': 100, 'max': 30000},
+                    'cpu_threshold': {'type': int, 'min': 10, 'max': 95},
+                    'memory_threshold': {'type': int, 'min': 10, 'max': 95}
+                }
+            }
+            
+            # Validate each section
+            for section, values in config_updates.items():
+                if section not in validation_rules:
+                    continue
+                    
+                if not isinstance(values, dict):
+                    return {'valid': False, 'error': f'Invalid format for section {section}'}
+                
+                for key, value in values.items():
+                    if key not in validation_rules[section]:
+                        continue
+                    
+                    rule = validation_rules[section][key]
+                    
+                    # Type validation
+                    if not isinstance(value, rule['type']):
+                        return {'valid': False, 'error': f'Invalid type for {section}.{key}'}
+                    
+                    # Range validation
+                    if 'min' in rule and value < rule['min']:
+                        return {'valid': False, 'error': f'{section}.{key} must be >= {rule["min"]}'}
+                    
+                    if 'max' in rule and value > rule['max']:
+                        return {'valid': False, 'error': f'{section}.{key} must be <= {rule["max"]}'}
+                    
+                    # Choice validation
+                    if 'choices' in rule and value not in rule['choices']:
+                        return {'valid': False, 'error': f'{section}.{key} must be one of {rule["choices"]}'}
+            
+            return {'valid': True}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Validation error: {str(e)}'}
+
+    def _apply_config_updates(self, config_updates):
+        """Apply configuration updates to the shield manager."""
+        try:
+            # Update shield manager configuration
+            if hasattr(self.shield_manager, 'config'):
+                for section, values in config_updates.items():
+                    if section in self.shield_manager.config:
+                        self.shield_manager.config[section].update(values)
+                    else:
+                        self.shield_manager.config[section] = values
+            
+            # Apply specific updates to components
+            if 'rate_limiter' in config_updates:
+                if hasattr(self.shield_manager, 'rate_limiter'):
+                    rate_config = config_updates['rate_limiter']
+                    if 'rate' in rate_config:
+                        self.shield_manager.rate_limiter.rate = rate_config['rate']
+                    if 'burst' in rate_config:
+                        self.shield_manager.rate_limiter.burst = rate_config['burst']
+            
+            if 'anomaly_detector' in config_updates:
+                if hasattr(self.shield_manager, 'anomaly_detector'):
+                    anomaly_config = config_updates['anomaly_detector']
+                    if 'request_window' in anomaly_config:
+                        self.shield_manager.anomaly_detector.request_window = anomaly_config['request_window']
+                    if 'rate_threshold' in anomaly_config:
+                        self.shield_manager.anomaly_detector.rate_threshold = anomaly_config['rate_threshold']
+            
+            # Log the configuration change
+            logger.info(f"Applied configuration updates: {config_updates}")
+            
+        except Exception as e:
+            logger.error(f"Error applying config updates: {e}")
+            raise
 
     def run(self, host='0.0.0.0', port=8080, debug=False):
         """Run the enhanced dashboard server."""

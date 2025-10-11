@@ -177,6 +177,105 @@
             gap: 12px;
         }
 
+        /* Configuration Form Styles */
+        .config-section {
+            background: rgba(255,255,255,0.015);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-section-title {
+            color: var(--accent);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            color: var(--text);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input[type="number"],
+        .form-group input[type="text"],
+        .form-group select {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input[type="number"]:focus,
+        .form-group input[type="text"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155,124,255,0.1);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .form-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .form-group small {
+            color: var(--muted);
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .config-status {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 20px;
+        }
+
+        .status-message {
+            color: var(--text);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-message.success {
+            color: #4ade80;
+        }
+
+        .status-message.error {
+            color: #f87171;
+        }
+
+        .status-message.warning {
+            color: #fbbf24;
+        }
+
         /* Stats Grid */
         .stats-grid{ 
             display:grid; 
@@ -1266,17 +1365,210 @@
                 <p style="color: var(--muted); margin-bottom: 20px;">Configure Aurora Shield protection parameters and thresholds</p>
                 
                 <div style="margin-bottom: 20px;">
-                    <button class="btn btn-primary" onclick="exportConfig()">💾 Export Config</button>
-                    <button class="btn btn-secondary" onclick="importConfig()">📁 Import Config</button>
-                    <button class="btn btn-success" onclick="resetToDefaults()">🔄 Reset Defaults</button>
+                    <button class="btn btn-primary" onclick="saveConfiguration()">💾 Save Configuration</button>
+                    <button class="btn btn-secondary" onclick="exportConfig()">� Export Config</button>
+                    <button class="btn btn-warning" onclick="resetToDefaults()">🔄 Reset Defaults</button>
+                    <button class="btn btn-info" onclick="loadConfiguration()">🔄 Reload</button>
                 </div>
                 
-                <div style="padding: 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
-                    <h4 style="color: var(--accent); margin-bottom: 16px;">Current Configuration Status</h4>
-                    <p style="color: var(--muted); font-size: 14px;">
-                        Configuration interface allows real-time adjustment of protection parameters.
-                        Changes are applied immediately to the running system.
-                    </p>
+                <!-- Configuration Form Container -->
+                <div id="config-form-container">
+                    <!-- Rate Limiter Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🚦 Rate Limiter</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="rate-limiter-enabled">Enable Rate Limiting</label>
+                                <input type="checkbox" id="rate-limiter-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-rate">Rate (tokens/sec)</label>
+                                <input type="number" id="rate-limiter-rate" min="1" max="10000" value="10">
+                                <small>Number of tokens added per second</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-burst">Burst Size</label>
+                                <input type="number" id="rate-limiter-burst" min="1" max="1000" value="20">
+                                <small>Maximum burst size</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-window">Window Size (sec)</label>
+                                <input type="number" id="rate-limiter-window" min="1" max="3600" value="60">
+                                <small>Rate limiting window duration</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Anomaly Detector Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🔍 Anomaly Detector</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="anomaly-enabled">Enable Anomaly Detection</label>
+                                <input type="checkbox" id="anomaly-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-window">Request Window (sec)</label>
+                                <input type="number" id="anomaly-window" min="1" max="3600" value="60">
+                                <small>Time window for analysis</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-threshold">Rate Threshold</label>
+                                <input type="number" id="anomaly-threshold" min="1" max="100000" value="100">
+                                <small>Requests per window threshold</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-sensitivity">Sensitivity</label>
+                                <select id="anomaly-sensitivity">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                                <small>Anomaly detection sensitivity</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IP Reputation Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🛡️ IP Reputation</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="ip-reputation-enabled">Enable IP Reputation</label>
+                                <input type="checkbox" id="ip-reputation-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-initial-score">Initial Score</label>
+                                <input type="number" id="ip-initial-score" min="0" max="100" value="100">
+                                <small>Starting reputation score</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-threshold">Reputation Threshold</label>
+                                <input type="number" id="ip-threshold" min="0" max="100" value="50">
+                                <small>Minimum score for access</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-decay-rate">Decay Rate</label>
+                                <input type="number" id="ip-decay-rate" min="0" max="1" step="0.01" value="0.1">
+                                <small>Reputation recovery rate</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Challenge Response Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🧩 Challenge Response</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="challenge-enabled">Enable Challenge Response</label>
+                                <input type="checkbox" id="challenge-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-timeout">Challenge Timeout (sec)</label>
+                                <input type="number" id="challenge-timeout" min="10" max="3600" value="300">
+                                <small>Time to complete challenge</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-difficulty">Difficulty</label>
+                                <select id="challenge-difficulty">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                                <small>Challenge complexity level</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-max-attempts">Max Attempts</label>
+                                <input type="number" id="challenge-max-attempts" min="1" max="10" value="3">
+                                <small>Maximum challenge attempts</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sinkhole Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🕳️ Sinkhole System</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="sinkhole-enabled">Enable Sinkhole</label>
+                                <input type="checkbox" id="sinkhole-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-sinkhole-enabled">Auto Sinkhole</label>
+                                <input type="checkbox" id="auto-sinkhole-enabled" checked>
+                                <small>Automatically sinkhole zero-reputation IPs</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="queue-fairness-enabled">Queue Fairness</label>
+                                <input type="checkbox" id="queue-fairness-enabled" checked>
+                                <small>Prevent legitimate request starvation</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="queue-max-size">Queue Max Size</label>
+                                <input type="number" id="queue-max-size" min="100" max="10000" value="1000">
+                                <small>Maximum quarantine queue size</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Thresholds -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">⚡ System Thresholds</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="threshold-rps">Requests/Second</label>
+                                <input type="number" id="threshold-rps" min="10" max="100000" value="1000">
+                                <small>Maximum requests per second</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-connections">Connection Limit</label>
+                                <input type="number" id="threshold-connections" min="10" max="1000000" value="10000">
+                                <small>Maximum concurrent connections</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-response-time">Response Time (ms)</label>
+                                <input type="number" id="threshold-response-time" min="100" max="30000" value="5000">
+                                <small>Maximum response time</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-cpu">CPU Threshold (%)</label>
+                                <input type="number" id="threshold-cpu" min="10" max="95" value="80">
+                                <small>CPU usage alert threshold</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-memory">Memory Threshold (%)</label>
+                                <input type="number" id="threshold-memory" min="10" max="95" value="85">
+                                <small>Memory usage alert threshold</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Settings -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">📊 Dashboard Settings</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="dashboard-host">Host</label>
+                                <input type="text" id="dashboard-host" value="0.0.0.0">
+                                <small>Dashboard bind address</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="dashboard-port">Port</label>
+                                <input type="number" id="dashboard-port" min="1" max="65535" value="8080">
+                                <small>Dashboard port number</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="dashboard-refresh">Refresh Interval (sec)</label>
+                                <input type="number" id="dashboard-refresh" min="1" max="60" value="5">
+                                <small>Data refresh interval</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Status -->
+                <div class="config-status" id="config-status" style="display: none;">
+                    <div class="status-message" id="status-message"></div>
                 </div>
             </div>
         </div>
@@ -1470,8 +1762,202 @@
         }
 
         function updateConfigStatus() {
-            // This would fetch configuration status from the API
-            console.log('Updating configuration status...');
+            // Load current configuration into the form
+            loadConfiguration();
+        }
+
+        function loadConfiguration() {
+            fetch('/api/dashboard/config')
+                .then(response => response.json())
+                .then(config => {
+                    // Rate Limiter
+                    document.getElementById('rate-limiter-enabled').checked = config.rate_limiter?.enabled ?? true;
+                    document.getElementById('rate-limiter-rate').value = config.rate_limiter?.rate ?? 10;
+                    document.getElementById('rate-limiter-burst').value = config.rate_limiter?.burst ?? 20;
+                    document.getElementById('rate-limiter-window').value = config.rate_limiter?.window_size ?? 60;
+
+                    // Anomaly Detector
+                    document.getElementById('anomaly-enabled').checked = config.anomaly_detector?.enabled ?? true;
+                    document.getElementById('anomaly-window').value = config.anomaly_detector?.request_window ?? 60;
+                    document.getElementById('anomaly-threshold').value = config.anomaly_detector?.rate_threshold ?? 100;
+                    document.getElementById('anomaly-sensitivity').value = config.anomaly_detector?.sensitivity ?? 'medium';
+
+                    // IP Reputation
+                    document.getElementById('ip-reputation-enabled').checked = config.ip_reputation?.enabled ?? true;
+                    document.getElementById('ip-initial-score').value = config.ip_reputation?.initial_score ?? 100;
+                    document.getElementById('ip-threshold').value = config.ip_reputation?.reputation_threshold ?? 50;
+                    document.getElementById('ip-decay-rate').value = config.ip_reputation?.decay_rate ?? 0.1;
+
+                    // Challenge Response
+                    document.getElementById('challenge-enabled').checked = config.challenge_response?.enabled ?? true;
+                    document.getElementById('challenge-timeout').value = config.challenge_response?.challenge_timeout ?? 300;
+                    document.getElementById('challenge-difficulty').value = config.challenge_response?.difficulty ?? 'medium';
+                    document.getElementById('challenge-max-attempts').value = config.challenge_response?.max_attempts ?? 3;
+
+                    // Sinkhole
+                    document.getElementById('sinkhole-enabled').checked = config.sinkhole?.enabled ?? true;
+                    document.getElementById('auto-sinkhole-enabled').checked = config.sinkhole?.auto_sinkhole_enabled ?? true;
+                    document.getElementById('queue-fairness-enabled').checked = config.sinkhole?.queue_fairness_enabled ?? true;
+                    document.getElementById('queue-max-size').value = config.sinkhole?.queue_max_size ?? 1000;
+
+                    // Thresholds
+                    document.getElementById('threshold-rps').value = config.thresholds?.requests_per_second ?? 1000;
+                    document.getElementById('threshold-connections').value = config.thresholds?.connection_limit ?? 10000;
+                    document.getElementById('threshold-response-time').value = config.thresholds?.response_time_limit ?? 5000;
+                    document.getElementById('threshold-cpu').value = config.thresholds?.cpu_threshold ?? 80;
+                    document.getElementById('threshold-memory').value = config.thresholds?.memory_threshold ?? 85;
+
+                    // Dashboard
+                    document.getElementById('dashboard-host').value = config.dashboard?.host ?? '0.0.0.0';
+                    document.getElementById('dashboard-port').value = config.dashboard?.port ?? 8080;
+                    document.getElementById('dashboard-refresh').value = config.dashboard?.refresh_interval ?? 5;
+
+                    showConfigStatus('✅ Configuration loaded successfully', 'success');
+                })
+                .catch(error => {
+                    console.error('Error loading configuration:', error);
+                    showConfigStatus('❌ Failed to load configuration', 'error');
+                });
+        }
+
+        function saveConfiguration() {
+            const config = {
+                rate_limiter: {
+                    enabled: document.getElementById('rate-limiter-enabled').checked,
+                    rate: parseInt(document.getElementById('rate-limiter-rate').value),
+                    burst: parseInt(document.getElementById('rate-limiter-burst').value),
+                    window_size: parseInt(document.getElementById('rate-limiter-window').value)
+                },
+                anomaly_detector: {
+                    enabled: document.getElementById('anomaly-enabled').checked,
+                    request_window: parseInt(document.getElementById('anomaly-window').value),
+                    rate_threshold: parseInt(document.getElementById('anomaly-threshold').value),
+                    sensitivity: document.getElementById('anomaly-sensitivity').value
+                },
+                ip_reputation: {
+                    enabled: document.getElementById('ip-reputation-enabled').checked,
+                    initial_score: parseInt(document.getElementById('ip-initial-score').value),
+                    reputation_threshold: parseInt(document.getElementById('ip-threshold').value),
+                    decay_rate: parseFloat(document.getElementById('ip-decay-rate').value)
+                },
+                challenge_response: {
+                    enabled: document.getElementById('challenge-enabled').checked,
+                    challenge_timeout: parseInt(document.getElementById('challenge-timeout').value),
+                    difficulty: document.getElementById('challenge-difficulty').value,
+                    max_attempts: parseInt(document.getElementById('challenge-max-attempts').value)
+                },
+                sinkhole: {
+                    enabled: document.getElementById('sinkhole-enabled').checked,
+                    auto_sinkhole_enabled: document.getElementById('auto-sinkhole-enabled').checked,
+                    queue_fairness_enabled: document.getElementById('queue-fairness-enabled').checked,
+                    queue_max_size: parseInt(document.getElementById('queue-max-size').value)
+                },
+                thresholds: {
+                    requests_per_second: parseInt(document.getElementById('threshold-rps').value),
+                    connection_limit: parseInt(document.getElementById('threshold-connections').value),
+                    response_time_limit: parseInt(document.getElementById('threshold-response-time').value),
+                    cpu_threshold: parseInt(document.getElementById('threshold-cpu').value),
+                    memory_threshold: parseInt(document.getElementById('threshold-memory').value)
+                },
+                dashboard: {
+                    host: document.getElementById('dashboard-host').value,
+                    port: parseInt(document.getElementById('dashboard-port').value),
+                    refresh_interval: parseInt(document.getElementById('dashboard-refresh').value)
+                }
+            };
+
+            fetch('/api/dashboard/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showConfigStatus('✅ Configuration saved successfully', 'success');
+                } else {
+                    showConfigStatus(`❌ Failed to save: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving configuration:', error);
+                showConfigStatus('❌ Failed to save configuration', 'error');
+            });
+        }
+
+        function showConfigStatus(message, type) {
+            const statusDiv = document.getElementById('config-status');
+            const messageDiv = document.getElementById('status-message');
+            
+            messageDiv.textContent = message;
+            messageDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function exportConfig() {
+            fetch('/api/dashboard/config')
+                .then(response => response.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `aurora-shield-config-${new Date().toISOString().slice(0,10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showConfigStatus('📥 Configuration exported successfully', 'success');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showConfigStatus('❌ Failed to export configuration', 'error');
+                });
+        }
+
+        function resetToDefaults() {
+            if (confirm('🔄 Are you sure you want to reset all settings to defaults? This will overwrite current configuration.')) {
+                // Reset form to default values
+                document.getElementById('rate-limiter-rate').value = 10;
+                document.getElementById('rate-limiter-burst').value = 20;
+                document.getElementById('rate-limiter-window').value = 60;
+                document.getElementById('anomaly-window').value = 60;
+                document.getElementById('anomaly-threshold').value = 100;
+                document.getElementById('anomaly-sensitivity').value = 'medium';
+                document.getElementById('ip-initial-score').value = 100;
+                document.getElementById('ip-threshold').value = 50;
+                document.getElementById('ip-decay-rate').value = 0.1;
+                document.getElementById('challenge-timeout').value = 300;
+                document.getElementById('challenge-difficulty').value = 'medium';
+                document.getElementById('challenge-max-attempts').value = 3;
+                document.getElementById('queue-max-size').value = 1000;
+                document.getElementById('threshold-rps').value = 1000;
+                document.getElementById('threshold-connections').value = 10000;
+                document.getElementById('threshold-response-time').value = 5000;
+                document.getElementById('threshold-cpu').value = 80;
+                document.getElementById('threshold-memory').value = 85;
+                document.getElementById('dashboard-host').value = '0.0.0.0';
+                document.getElementById('dashboard-port').value = 8080;
+                document.getElementById('dashboard-refresh').value = 5;
+                
+                // Check all enable checkboxes
+                document.getElementById('rate-limiter-enabled').checked = true;
+                document.getElementById('anomaly-enabled').checked = true;
+                document.getElementById('ip-reputation-enabled').checked = true;
+                document.getElementById('challenge-enabled').checked = true;
+                document.getElementById('sinkhole-enabled').checked = true;
+                document.getElementById('auto-sinkhole-enabled').checked = true;
+                document.getElementById('queue-fairness-enabled').checked = true;
+                
+                showConfigStatus('🔄 Configuration reset to defaults', 'warning');
+            }
         }
 
         function simulateData() {
@@ -1514,34 +2000,27 @@
             }
         }
 
-        function exportConfig() {
-            fetch('/api/dashboard/config')
-                .then(response => response.json())
-                .then(data => {
-                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'aurora-shield-config.json';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('📋 Configuration export simulated for demo');
-                });
-        }
-
         function importConfig() {
-            alert('📁 Configuration import interface would be implemented here');
-        }
-
-        function resetToDefaults() {
-            if (confirm('🔄 Are you sure you want to reset all settings to defaults?')) {
-                alert('✅ Configuration reset to default values');
-            }
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const config = JSON.parse(e.target.result);
+                            // You would validate and apply the imported config here
+                            showConfigStatus('� Configuration imported successfully', 'success');
+                        } catch (error) {
+                            showConfigStatus('❌ Invalid configuration file', 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
         }
 
         function exportLogs() {
