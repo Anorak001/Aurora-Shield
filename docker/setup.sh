@@ -80,6 +80,15 @@ curl -s -o /dev/null -w "Tertiary CDN: %{http_code}\n" http://localhost:8082 || 
 echo "Testing Load Balancer UI (port 8090)..."
 curl -s -o /dev/null -w "Load Balancer UI: %{http_code}\n" http://localhost:8090 || echo "Load Balancer UI: Not ready"
 
+echo "Testing Attack Simulator 1 (port 5001)..."
+curl -s -o /dev/null -w "Attack Simulator 1: %{http_code}\n" http://localhost:5001 || echo "Attack Simulator 1: Not ready"
+
+echo "Testing Attack Simulator 2 (port 5002)..."
+curl -s -o /dev/null -w "Attack Simulator 2: %{http_code}\n" http://localhost:5002 || echo "Attack Simulator 2: Not ready"
+
+echo "Testing Attack Simulator 3 (port 5003)..."
+curl -s -o /dev/null -w "Attack Simulator 3: %{http_code}\n" http://localhost:5003 || echo "Attack Simulator 3: Not ready"
+
 echo
 echo "✅ Setup complete! All services have been started."
 echo
@@ -87,7 +96,7 @@ echo "🎉 Aurora Shield Demo Environment is ready!"
 echo
 echo "📊 Main Access Points:"
 echo "   🛡️  Aurora Shield Dashboard: http://localhost:8080"
-echo "   🌐  Service Management Dashboard: python service_dashboard.py (then http://localhost:5000)"
+echo "   🌐  Service Management Dashboard: http://localhost:5000"
 echo "   🔐  Login: admin/admin123 or user/user123"
 echo
 echo "🌐 CDN Services (Content Delivery Network):"
@@ -105,10 +114,14 @@ echo "   📊  Kibana (Logs): http://localhost:5601"
 echo "   📈  Grafana (Metrics): http://localhost:3000 (admin/admin)"
 echo "   🎯  Prometheus: http://localhost:9090"
 echo
-echo "⚔️  Attack Simulation:"
-echo "   🌐  Attack Simulator Web Interface: http://localhost:5001"
+echo "⚔️  Attack Simulation (Independent Multi-Vector Testing):"
+echo "   🌐  Attack Simulator Web Interface 1: http://localhost:5001"
+echo "   🌐  Attack Simulator Web Interface 2: http://localhost:5002"
+echo "   🌐  Attack Simulator Web Interface 3: http://localhost:5003"
 echo "   💥  Configure attacks, set request rates, target selection"
 echo "   📊  Real-time attack statistics and monitoring"
+echo "   🎯  Each simulator can target different CDNs independently"
+echo "   ⚔️  Support for concurrent multi-vector attack scenarios"
 echo
 echo "🎛️  Load Balancer Features:"
 echo "   🔄  CDN Restart: Select and restart individual CDN services"
@@ -124,9 +137,17 @@ echo "   Test secondary CDN: curl http://localhost:8090/cdn/secondary/"
 echo "   Test tertiary CDN: curl http://localhost:8090/cdn/tertiary/"
 echo "   Check CDN health: curl http://localhost:808{1,2}/health"
 echo
+echo "⚔️  Attack Simulator Testing Commands:"
+echo "   Test Attack Simulator 1: curl http://localhost:5001/"
+echo "   Test Attack Simulator 2: curl http://localhost:5002/"
+echo "   Test Attack Simulator 3: curl http://localhost:5003/"
+echo "   View Attack Stats: Check /stats endpoint on each simulator"
+echo
 echo "🛑 Management Commands:"
 echo "   Stop everything: docker-compose down"
 echo "   Restart CDN services: docker-compose restart demo-webapp demo-webapp-cdn2 demo-webapp-cdn3"
 echo "   Restart load balancer: docker-compose restart load-balancer"
+echo "   Restart attack simulators: docker-compose restart client client-2 client-3"
 echo "   View logs: docker-compose logs -f [service-name]"
-echo "   Service dashboard: python service_dashboard.py"
+echo "   View attack logs: docker-compose logs -f client client-2 client-3"
+echo "   Service dashboard: Access at http://localhost:5000"

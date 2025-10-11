@@ -3,10 +3,12 @@
 ## ✅ **What's New**
 
 ### **🌐 Web-Based Attack Simulator**
-- **URL**: http://localhost:5001
-- **Always Running**: Client container now runs continuously with the web interface
-- **Interactive Configuration**: Set attack parameters through a beautiful web UI
-- **Real-Time Monitoring**: Live statistics and attack progress tracking
+- **URL 1**: http://localhost:5001 (Primary Simulator)
+- **URL 2**: http://localhost:5002 (Secondary Simulator)
+- **URL 3**: http://localhost:5003 (Tertiary Simulator)
+- **Always Running**: Multiple client containers now run continuously with web interfaces
+- **Interactive Configuration**: Set attack parameters through beautiful web UIs
+- **Real-Time Monitoring**: Live statistics and attack progress tracking across all instances
 
 ### **⚔️ Attack Types Available**
 
@@ -53,12 +55,14 @@
 .\docker\setup.bat
 ```
 
-### **2. Access Attack Simulator**
-- Open browser to: **http://localhost:5001**
-- Select attack type and configure parameters
+### **2. Access Attack Simulators**
+- Open browser to: **http://localhost:5001** (Primary Simulator)
+- Open browser to: **http://localhost:5002** (Secondary Simulator)
+- Open browser to: **http://localhost:5003** (Tertiary Simulator)
+- Select attack type and configure parameters on each instance
 - Choose target (direct to Aurora Shield or through Load Balancer)
-- Click launch to start attack
-- Monitor real-time statistics
+- Click launch to start attacks from multiple simulators
+- Monitor real-time statistics across all instances
 
 ### **3. Key Features**
 - **⏹️ Stop Controls**: Stop individual attacks or all attacks
@@ -69,15 +73,15 @@
 ## 🔧 **Technical Details**
 
 ### **Container Changes**
-- **Client Container**: Now runs Flask web server on port 5001
+- **Client Containers**: Now run Flask web servers on ports 5001, 5002, and 5003
 - **Always Running**: `restart: unless-stopped` policy
 - **Dependencies**: Added Flask to requirements
 
 ### **Architecture Flow**
 ```
-Attack Simulator (Port 5001) 
+Attack Simulators (Ports 5001, 5002, 5003) 
     ↓ (Configure attacks)
-Client Container 
+Client Containers 
     ↓ (Send requests to...)
 Target Options:
     → Aurora Shield Direct (Port 8080)
@@ -94,7 +98,9 @@ Target Options:
 | Service | Port | Purpose |
 |---------|------|---------|
 | **Aurora Shield** | 8080 | Main DDoS protection |
-| **Attack Simulator** | 5001 | **NEW** Web-based attack configuration |
+| **Attack Simulator 1** | 5001 | **NEW** Web-based attack configuration |
+| **Attack Simulator 2** | 5002 | **NEW** Web-based attack configuration |
+| **Attack Simulator 3** | 5003 | **NEW** Web-based attack configuration |
 | **Service Dashboard** | 5000 | Service management |
 | **Protected Web App** | 80 | Demo application |
 | **Load Balancer** | 8090 | Traffic routing |
