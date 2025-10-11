@@ -399,6 +399,232 @@
         .action-quarantined { background: rgba(126,224,246,0.3); color: #7EE0F6; }
         .action-blocked { background: rgba(155,124,255,0.3); color: #9B7CFF; }
 
+        /* Enhanced Attack Activity Styles */
+        .attack-activity-container {
+            background: linear-gradient(135deg, rgba(20,25,47,0.9), rgba(25,30,52,0.8));
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .attack-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 0.9rem;
+            color: #B8BCC8;
+            font-weight: 500;
+        }
+
+        .filter-select {
+            background: rgba(30,35,57,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #FFFFFF;
+            font-size: 0.9rem;
+            min-width: 120px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #00D4AA;
+            box-shadow: 0 0 0 2px rgba(0,212,170,0.2);
+        }
+
+        .attack-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(30,35,57,0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00D4AA;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #B8BCC8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .attack-log-enhanced {
+            background: rgba(15,20,35,0.6);
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .attack-entry {
+            display: grid;
+            grid-template-columns: 120px 1fr 150px 120px 100px;
+            gap: 15px;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .attack-entry:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .attack-time {
+            font-size: 0.85rem;
+            color: #B8BCC8;
+            font-family: 'Courier New', monospace;
+        }
+
+        .attack-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .attack-ip {
+            font-weight: bold;
+            color: #FF6B6B;
+            font-family: 'Courier New', monospace;
+        }
+
+        .attack-location {
+            font-size: 0.8rem;
+            color: #B8BCC8;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .attack-info {
+            font-size: 0.8rem;
+            color: #B8BCC8;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .attack-type {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .attack-severity {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .severity-critical {
+            background: rgba(255,107,107,0.2);
+            color: #FF6B6B;
+            border: 1px solid rgba(255,107,107,0.3);
+        }
+
+        .severity-high {
+            background: rgba(255,147,79,0.2);
+            color: #FF934F;
+            border: 1px solid rgba(255,147,79,0.3);
+        }
+
+        .severity-medium {
+            background: rgba(255,208,79,0.2);
+            color: #FFD04F;
+            border: 1px solid rgba(255,208,79,0.3);
+        }
+
+        .severity-low {
+            background: rgba(79,255,147,0.2);
+            color: #4FFF93;
+            border: 1px solid rgba(79,255,147,0.3);
+        }
+
+        .attack-action {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .action-blocked {
+            background: rgba(155,124,255,0.2);
+            color: #9B7CFF;
+            border: 1px solid rgba(155,124,255,0.3);
+        }
+
+        .action-rate-limited {
+            background: rgba(255,147,79,0.2);
+            color: #FF934F;
+            border: 1px solid rgba(255,147,79,0.3);
+        }
+
+        .action-challenged {
+            background: rgba(255,208,79,0.2);
+            color: #FFD04F;
+            border: 1px solid rgba(255,208,79,0.3);
+        }
+
+        .action-monitored {
+            background: rgba(79,255,147,0.2);
+            color: #4FFF93;
+            border: 1px solid rgba(79,255,147,0.3);
+        }
+
+        .refresh-button {
+            background: linear-gradient(135deg, #00D4AA, #00B894);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .refresh-button:hover {
+            background: linear-gradient(135deg, #00B894, #00A085);
+            transform: translateY(-1px);
+        }
+
+        .no-attacks {
+            text-align: center;
+            padding: 40px;
+            color: #B8BCC8;
+            font-style: italic;
+        }
+
         /* Threat Summary Grid */
         .threat-summary-grid {
             display: grid;
@@ -786,8 +1012,8 @@
         }
 
         .ip-entry {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
             align-items: center;
             padding: 12px;
             background: rgba(255,255,255,0.02);
@@ -799,23 +1025,24 @@
         .ip-address {
             color: var(--accent-2);
             font-family: 'Courier New', monospace;
-            flex: 1;
         }
 
         .ip-score {
             font-weight: 600;
-            flex: 0 0 auto;
         }
 
         .ip-requests {
             color: var(--muted);
             font-size: 12px;
-            flex: 0 0 auto;
         }
 
-        .ip-blocked {
+        .ip-violations {
             font-size: 11px;
-            flex: 0 0 auto;
+        }
+
+        .ip-status {
+            font-size: 10px;
+            text-align: right;
         }
 
         .ip-score.good { color: var(--success); }
@@ -1101,10 +1328,62 @@
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
                     <div class="panel-title">🚨 Recent Attack Activity & Actions Taken</div>
-                    <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="refresh-button" onclick="refreshAttackActivity()">🔄 Refresh</button>
+                        <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
+                    </div>
                 </div>
-                <div class="attack-log" id="attackLog">
-                    <!-- Attack logs will be populated by JavaScript -->
+                
+                <!-- Enhanced Attack Activity Container -->
+                <div class="attack-activity-container">
+                    <!-- Attack Filters -->
+                    <div class="attack-filters">
+                        <div class="filter-group">
+                            <label>Filter by Severity:</label>
+                            <select class="filter-select" id="severity-filter" onchange="onSeverityFilterChange(this)">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Filter by Action:</label>
+                            <select class="filter-select" id="action-filter" onchange="onActionFilterChange(this)">
+                                <option value="all">All Actions</option>
+                                <option value="blocked">Blocked</option>
+                                <option value="rate-limited">Rate Limited</option>
+                                <option value="challenged">Challenged</option>
+                                <option value="monitored">Monitored</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Attack Statistics -->
+                    <div class="attack-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="total-attacks">0</div>
+                            <div class="stat-label">Total Attacks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="critical-attacks">0</div>
+                            <div class="stat-label">Critical</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="blocked-attacks">0</div>
+                            <div class="stat-label">Blocked</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="unique-ips">0</div>
+                            <div class="stat-label">Unique IPs</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Enhanced Attack Log -->
+                    <div class="attack-log-enhanced" id="enhanced-attack-log">
+                        <div class="no-attacks">Loading attack activity...</div>
+                    </div>
                 </div>
                 
                 <div style="margin-top: 30px;">
@@ -1644,8 +1923,8 @@
                         lastUpdatedElement.textContent = `Last updated: ${timestamp}`;
                     }
                     
-                    // Update attack log
-                    updateAttackLog(data.recent_attacks || []);
+                    // Update enhanced attack activity
+                    updateEnhancedAttackActivity();
                     
                     // Update threat intelligence summary
                     updateThreatIntelligence();
@@ -1665,30 +1944,6 @@
                     console.error('Error fetching stats:', error);
                     simulateData(); // Fallback to simulated data
                 });
-        }
-
-        function updateAttackLog(attacks) {
-            const log = document.getElementById('attackLog');
-            if (!log) return;
-            
-            // Show real attack data if available, otherwise show empty state
-            if (attacks.length === 0) {
-                log.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px;">No recent attacks detected</div>';
-                return;
-            }
-
-            log.innerHTML = attacks.slice(0, 8).map(attack => `
-                <div class="attack-log-item">
-                    <div>
-                        <span class="attack-type attack-${(attack.attack_type || attack.type || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '-')}">${attack.attack_type || attack.type || 'Unknown'}</span>
-                        <span style="margin-left: 12px; color: #dbe6ff; font-weight: 600;">${attack.ip || attack.source}</span>
-                        <span class="action-taken action-${getActionClass(attack.action_taken)}">${attack.action_taken || attack.status}</span>
-                    </div>
-                    <div>
-                        <span style="color: var(--muted); font-size: 11px;">${formatAttackTimestamp(attack.timestamp)}</span>
-                    </div>
-                </div>
-            `).join('');
         }
 
         function getActionClass(action) {
@@ -2355,9 +2610,9 @@
             const ipList = document.getElementById('ip-reputation-list');
             if (!ipList) return;
             
-            // Convert backend data to sorted list
+            // Convert backend data to sorted list by reputation score (lowest first to show problematic IPs)
             const topIPs = Object.entries(ipReputationData)
-                .sort(([,a], [,b]) => b.total_requests - a.total_requests)
+                .sort(([,a], [,b]) => a.reputation_score - b.reputation_score)
                 .slice(0, 8); // Show top 8 IPs
             
             if (topIPs.length === 0) {
@@ -2369,16 +2624,27 @@
                 const score = Math.round(data.reputation_score);
                 const scoreClass = score >= 80 ? 'good' : score >= 50 ? 'suspicious' : 'malicious';
                 const statusIcon = score >= 80 ? '✅' : score >= 50 ? '⚠️' : '🚫';
-                const blockedPercent = Math.round((data.blocked_requests / data.total_requests) * 100);
+                const violationCount = data.violation_count || 0;
+                const status = data.status || 'unknown';
+                
+                let statusBadge = '';
+                if (data.is_blacklisted) {
+                    statusBadge = '<span style="color: var(--danger); font-weight: bold;">BLACKLISTED</span>';
+                } else if (data.is_whitelisted) {
+                    statusBadge = '<span style="color: var(--success); font-weight: bold;">WHITELISTED</span>';
+                } else {
+                    statusBadge = `<span style="color: var(--muted); text-transform: uppercase;">${status}</span>`;
+                }
                 
                 return `
                     <div class="ip-entry">
                         <span class="ip-address">${ip}</span>
                         <span class="ip-score ${scoreClass}">${statusIcon} ${score}/100</span>
-                        <span class="ip-requests">${data.total_requests} req</span>
-                        <span class="ip-blocked" style="color: ${data.blocked_requests > 0 ? 'var(--danger)' : 'var(--muted)'}">
-                            ${data.blocked_requests} blocked (${blockedPercent}%)
+                        <span class="ip-requests">${data.total_requests || 0} req</span>
+                        <span class="ip-violations" style="color: ${violationCount > 0 ? 'var(--danger)' : 'var(--muted)'}">
+                            ${violationCount} violations
                         </span>
+                        <div class="ip-status">${statusBadge}</div>
                     </div>
                 `;
             }).join('');
@@ -2634,6 +2900,112 @@
                 console.error('Error:', error);
                 alert('Network error occurred');
             });
+        }
+
+        // Enhanced Attack Activity Functions
+        let currentAttackFilters = {
+            severity: 'all',
+            action: 'all',
+            limit: 50
+        };
+
+        function updateEnhancedAttackActivity() {
+            const params = new URLSearchParams({
+                severity: currentAttackFilters.severity,
+                action: currentAttackFilters.action,
+                limit: currentAttackFilters.limit
+            });
+
+            fetch(`/api/dashboard/attack-activity?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayAttackStats(data.data.statistics);
+                        displayAttackEntries(data.data.attacks);
+                    } else {
+                        console.error('Error fetching attack activity:', data.error);
+                        showEmptyAttackState();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching attack activity:', error);
+                    showEmptyAttackState();
+                });
+        }
+
+        function displayAttackStats(stats) {
+            document.getElementById('total-attacks').textContent = stats.total_attacks || 0;
+            document.getElementById('critical-attacks').textContent = stats.by_severity.critical || 0;
+            document.getElementById('blocked-attacks').textContent = stats.by_action.blocked || 0;
+            document.getElementById('unique-ips').textContent = stats.unique_ips || 0;
+        }
+
+        function displayAttackEntries(attacks) {
+            const container = document.getElementById('enhanced-attack-log');
+            if (!container) return;
+
+            if (attacks.length === 0) {
+                showEmptyAttackState();
+                return;
+            }
+
+            container.innerHTML = attacks.map(attack => `
+                <div class="attack-entry">
+                    <div class="attack-time">${formatAttackTime(attack.timestamp)}</div>
+                    <div class="attack-details">
+                        <div class="attack-ip">${attack.ip}</div>
+                        <div class="attack-info">
+                            📊 ${attack.total_requests || 0} requests (${attack.blocked_requests || 0} blocked)
+                        </div>
+                    </div>
+                    <div class="attack-type">${attack.attack_type}</div>
+                    <div class="attack-severity severity-${attack.severity.toLowerCase()}">
+                        ${attack.severity.toUpperCase()}
+                    </div>
+                    <div class="attack-action action-${attack.action_taken.toLowerCase().replace(' ', '-')}">
+                        ${attack.action_taken}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatAttackTime(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString();
+            } catch (error) {
+                return timestamp || 'Unknown';
+            }
+        }
+
+        function showEmptyAttackState() {
+            const container = document.getElementById('enhanced-attack-log');
+            if (container) {
+                container.innerHTML = '<div class="no-attacks">No recent attacks detected</div>';
+            }
+        }
+
+        function onSeverityFilterChange(select) {
+            currentAttackFilters.severity = select.value;
+            updateEnhancedAttackActivity();
+        }
+
+        function onActionFilterChange(select) {
+            currentAttackFilters.action = select.value;
+            updateEnhancedAttackActivity();
+        }
+
+        function refreshAttackActivity() {
+            updateEnhancedAttackActivity();
+            
+            // Add visual feedback to refresh button
+            const btn = document.querySelector('.refresh-button');
+            if (btn) {
+                btn.style.transform = 'scale(0.95) rotate(360deg)';
+                setTimeout(() => {
+                    btn.style.transform = '';
+                }, 300);
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {

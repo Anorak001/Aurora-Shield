@@ -8,6 +8,8 @@ import time
 import logging
 import os
 import json
+import random
+import requests
 import requests
 from datetime import datetime
 
@@ -370,6 +372,142 @@ class WebDashboard:
                 logger.error(f"Error fetching attacking IPs: {e}")
                 return jsonify({'error': 'Failed to fetch attacking IP data'}), 500
 
+        @self.app.route('/api/dashboard/attack-activity')
+        def get_detailed_attack_activity():
+            """Get detailed recent attack activity from attack orchestrator"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                import requests
+                from datetime import datetime, timedelta
+                
+                # Get filtering parameters
+                severity_filter = request.args.get('severity', 'all')
+                action_filter = request.args.get('action', 'all')
+                limit = int(request.args.get('limit', 20))
+                
+                # Fetch real attack data from attack orchestrator
+                attack_orchestrator_url = "http://attack-orchestrator:5003"
+                recent_attacks = []
+                
+                try:
+                    # Get active bots from attack orchestrator
+                    bots_response = requests.get(f"{attack_orchestrator_url}/api/bots", timeout=5)
+                    if bots_response.status_code == 200:
+                        bots_data = bots_response.json()
+                        
+                        for bot in bots_data.get('bots', []):
+                            # Only include active bots that have made requests
+                            if bot.get('total_requests', 0) > 0:
+                                # Calculate action taken based on success/blocked ratio
+                                total_req = bot.get('total_requests', 0)
+                                blocked_req = bot.get('blocked_requests', 0)
+                                successful_req = bot.get('successful_requests', 0)
+                                
+                                if blocked_req > successful_req:
+                                    action_taken = 'Blocked'
+                                    severity = 'high'
+                                elif blocked_req > 0:
+                                    action_taken = 'Rate Limited'
+                                    severity = 'medium'
+                                else:
+                                    action_taken = 'Monitored'
+                                    severity = 'low'
+                                
+                                # Map attack types to display names
+                                attack_type_mapping = {
+                                    'http_flood': 'HTTP Flood',
+                                    'ddos_burst': 'DDoS Burst',
+                                    'brute_force': 'Brute Force',
+                                    'slowloris': 'Slowloris',
+                                    'resource_exhaustion': 'Resource Exhaustion',
+                                    'normal': 'Normal Traffic'
+                                }
+                                
+                                attack_type = attack_type_mapping.get(
+                                    bot.get('attack_type', 'unknown'),
+                                    bot.get('attack_type', 'Unknown').title()
+                                )
+                                
+                                # Use last_activity timestamp if available
+                                timestamp = datetime.fromtimestamp(
+                                    bot.get('last_activity', bot.get('start_time', time.time()))
+                                ).isoformat()
+                                
+                                recent_attacks.append({
+                                    'ip': bot.get('ip', 'Unknown'),
+                                    'timestamp': timestamp,
+                                    'attack_type': attack_type,
+                                    'action_taken': action_taken,
+                                    'severity': severity,
+                                    'total_requests': total_req,
+                                    'blocked_requests': blocked_req,
+                                    'bot_id': bot.get('id', 'unknown'),
+                                    'status': bot.get('status', 'unknown')
+                                })
+                
+                except requests.RequestException as e:
+                    logger.warning(f"Could not connect to attack orchestrator: {e}")
+                    # Fall back to shield manager data if available
+                    for request_info in self.shield_manager.recent_requests[-20:]:
+                        if request_info.get('status') in ['blocked', 'rate-limited']:
+                            recent_attacks.append({
+                                'ip': request_info.get('ip', 'Unknown'),
+                                'timestamp': request_info.get('timestamp_iso', datetime.now().isoformat()),
+                                'attack_type': self._map_status_to_attack_type(request_info.get('status')),
+                                'action_taken': self._map_status_to_action(request_info.get('status')),
+                                'severity': self._get_attack_severity_from_status(request_info.get('status')),
+                                'total_requests': 1,
+                                'blocked_requests': 1 if request_info.get('status') == 'blocked' else 0,
+                                'bot_id': 'shield-manager',
+                                'status': request_info.get('status', 'unknown')
+                            })
+                
+                # Apply filters
+                if severity_filter != 'all':
+                    recent_attacks = [a for a in recent_attacks if a['severity'] == severity_filter]
+                    
+                if action_filter != 'all':
+                    recent_attacks = [a for a in recent_attacks if a['action_taken'].lower().replace(' ', '-') == action_filter]
+                
+                # Sort by timestamp (most recent first)
+                recent_attacks.sort(key=lambda x: x['timestamp'], reverse=True)
+                
+                # Calculate statistics from real data
+                statistics = {
+                    'total_attacks': len(recent_attacks),
+                    'by_severity': {
+                        'critical': len([a for a in recent_attacks if a['severity'] == 'critical']),
+                        'high': len([a for a in recent_attacks if a['severity'] == 'high']),
+                        'medium': len([a for a in recent_attacks if a['severity'] == 'medium']),
+                        'low': len([a for a in recent_attacks if a['severity'] == 'low'])
+                    },
+                    'by_action': {
+                        'blocked': len([a for a in recent_attacks if 'blocked' in a['action_taken'].lower()]),
+                        'rate-limited': len([a for a in recent_attacks if 'rate' in a['action_taken'].lower()]),
+                        'challenged': len([a for a in recent_attacks if 'challenge' in a['action_taken'].lower()]),
+                        'monitored': len([a for a in recent_attacks if 'monitor' in a['action_taken'].lower()])
+                    },
+                    'unique_ips': len(set(a['ip'] for a in recent_attacks)),
+                    'total_requests': sum(a.get('total_requests', 0) for a in recent_attacks),
+                    'total_blocked': sum(a.get('blocked_requests', 0) for a in recent_attacks)
+                }
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'attacks': recent_attacks[:limit],
+                        'statistics': statistics
+                    }
+                })
+                
+            except Exception as e:
+                logger.error(f"Error fetching attack activity: {e}")
+                return jsonify({'error': str(e)}), 500
+                logger.error(f"Error fetching attack activity: {e}")
+                return jsonify({'error': 'Failed to fetch attack activity'}), 500
+
         @self.app.route('/api/sinkhole/add', methods=['POST'])
         def add_to_sinkhole():
             """Add IP/subnet/fingerprint to sinkhole"""
@@ -640,39 +778,48 @@ class WebDashboard:
         return f"{hours}h {minutes}m"
 
     def _get_performance_metrics(self):
-        """Get current performance metrics including IP reputation data."""
+        """Get current performance metrics including real IP reputation data."""
         try:
             # Get real IP request counts from shield manager
             live_data = self.shield_manager.get_live_requests()
             ip_counts = live_data.get('ip_request_counts', {})
             
-            # Get recent requests for IP reputation analysis
-            recent_requests = live_data.get('requests', [])
+            # Get actual IP reputation scores from the IP reputation system
             ip_reputation_data = {}
             
-            # Analyze IP behavior for reputation scoring
+            # Get all tracked IPs from the reputation system
+            if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
+                for ip in self.shield_manager.ip_reputation.reputation_scores:
+                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
+                    
+                    # Get violation history count
+                    violation_count = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
+                    
+                    ip_reputation_data[ip] = {
+                        'reputation_score': reputation_info['score'],
+                        'status': reputation_info['status'],
+                        'allowed': reputation_info['allowed'],
+                        'violation_count': violation_count,
+                        'total_requests': ip_counts.get(ip, 0),
+                        'is_blacklisted': ip in self.shield_manager.ip_reputation.blacklist,
+                        'is_whitelisted': ip in self.shield_manager.ip_reputation.whitelist
+                    }
+            
+            # Also include IPs from recent requests that might not be in reputation system yet
+            recent_requests = live_data.get('requests', [])
             for request in recent_requests:
                 ip = request.get('ip', 'unknown')
-                status = request.get('status', 'allowed')
-                
-                if ip not in ip_reputation_data:
+                if ip not in ip_reputation_data and ip != 'unknown':
+                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
                     ip_reputation_data[ip] = {
-                        'total_requests': 0,
-                        'blocked_requests': 0,
-                        'allowed_requests': 0,
-                        'reputation_score': 100
+                        'reputation_score': reputation_info['score'],
+                        'status': reputation_info['status'],
+                        'allowed': reputation_info['allowed'],
+                        'violation_count': 0,
+                        'total_requests': ip_counts.get(ip, 0),
+                        'is_blacklisted': False,
+                        'is_whitelisted': False
                     }
-                
-                ip_reputation_data[ip]['total_requests'] += 1
-                
-                if status in ['blocked', 'rate-limited', 'blackholed', 'sinkholed']:
-                    ip_reputation_data[ip]['blocked_requests'] += 1
-                else:
-                    ip_reputation_data[ip]['allowed_requests'] += 1
-                
-                # Calculate reputation score based on behavior
-                blocked_ratio = ip_reputation_data[ip]['blocked_requests'] / ip_reputation_data[ip]['total_requests']
-                ip_reputation_data[ip]['reputation_score'] = max(0, 100 - (blocked_ratio * 100))
             
             return {
                 'response_time_ms': 45,
@@ -793,6 +940,161 @@ class WebDashboard:
         except Exception as e:
             logger.error(f"Error applying config updates: {e}")
             raise
+
+    def _get_country_from_ip(self, ip):
+        """Get country from IP address (simplified)"""
+        if not ip:
+            return 'Unknown'
+        
+        # Simple IP to country mapping for demo
+        ip_country_map = {
+            '192.168.': 'Local Network',
+            '10.0.': 'Private Network',
+            '172.16.': 'Private Network',
+            '203.0.113.': 'Documentation',
+            '198.51.100.': 'Test Network',
+            '45.76.': 'Russia',
+            '185.220.': 'Germany',
+            '77.234.': 'China'
+        }
+        
+        for ip_prefix, country in ip_country_map.items():
+            if ip.startswith(ip_prefix):
+                return country
+        
+        return 'Unknown'
+
+    def _get_attack_severity(self, attack_type):
+        """Determine attack severity based on type"""
+        if not attack_type:
+            return 'Low'
+        
+        attack_type_lower = attack_type.lower()
+        
+        if any(term in attack_type_lower for term in ['sql injection', 'command injection', 'zero-day', 'buffer overflow']):
+            return 'Critical'
+        elif any(term in attack_type_lower for term in ['xss', 'csrf', 'path traversal', 'ddos', 'brute force']):
+            return 'High'
+        elif any(term in attack_type_lower for term in ['bot detection', 'scanner', 'suspicious']):
+            return 'Medium'
+        else:
+            return 'Low'
+
+    def _generate_malicious_user_agent(self):
+        """Generate realistic malicious user agents"""
+        malicious_agents = [
+            'sqlmap/1.4.7#stable',
+            'Mozilla/5.0 (compatible; Nmap Scripting Engine)',
+            'python-requests/2.25.1',
+            'curl/7.68.0',
+            'Wget/1.20.3',
+            'Mozilla/5.0 AttackBot/1.0',
+            'masscan/1.3.2',
+            'Nikto/2.1.6',
+            'gobuster/3.1.0',
+            'dirb/2.22'
+        ]
+        
+        return random.choice(malicious_agents)
+
+    def _generate_attack_uri(self, attack_type):
+        """Generate realistic attack URIs based on attack type"""
+        if not attack_type:
+            return '/'
+        
+        attack_type_lower = attack_type.lower()
+        
+        if 'sql injection' in attack_type_lower:
+            return "/login?id=1' OR '1'='1"
+        elif 'xss' in attack_type_lower:
+            return "/search?q=<script>alert('xss')</script>"
+        elif 'path traversal' in attack_type_lower:
+            return "/file?path=../../../etc/passwd"
+        elif 'command injection' in attack_type_lower:
+            return "/exec?cmd=; rm -rf /"
+        elif 'brute force' in attack_type_lower:
+            return "/admin/login"
+        elif 'scanner' in attack_type_lower:
+            return "/admin/config.php"
+        elif 'bot' in attack_type_lower:
+            return "/robots.txt"
+        else:
+            return "/"
+
+    def _calculate_attack_stats(self, recent_attacks):
+        """Calculate attack statistics"""
+        if not recent_attacks:
+            return {
+                'total_attacks': 0,
+                'attacks_by_type': {},
+                'attacks_by_action': {},
+                'attacks_by_severity': {},
+                'top_attacking_ips': []
+            }
+        
+        # Count attacks by type
+        attacks_by_type = {}
+        attacks_by_action = {}
+        attacks_by_severity = {}
+    
+    def _map_status_to_attack_type(self, status):
+        """Map request status to attack type"""
+        status_mapping = {
+            'blocked': 'Malicious Request',
+            'rate-limited': 'Rate Limit Exceeded',
+            'sinkholed': 'Suspicious Activity',
+            'quarantined': 'Potential Threat'
+        }
+        return status_mapping.get(status, 'Unknown Attack')
+    
+    def _map_status_to_action(self, status):
+        """Map request status to action taken"""
+        action_mapping = {
+            'blocked': 'Blocked',
+            'rate-limited': 'Rate Limited',
+            'sinkholed': 'Sinkholed',
+            'quarantined': 'Quarantined'
+        }
+        return action_mapping.get(status, 'Monitored')
+    
+    def _get_attack_severity_from_status(self, status):
+        """Get attack severity based on status"""
+        severity_mapping = {
+            'blocked': 'high',
+            'rate-limited': 'medium',
+            'sinkholed': 'high',
+            'quarantined': 'critical'
+        }
+        return severity_mapping.get(status, 'low')
+        ip_attack_counts = {}
+        
+        for attack in recent_attacks:
+            # Count by type
+            attack_type = attack.get('attack_type', 'Unknown')
+            attacks_by_type[attack_type] = attacks_by_type.get(attack_type, 0) + 1
+            
+            # Count by action
+            action = attack.get('action_taken', 'Unknown')
+            attacks_by_action[action] = attacks_by_action.get(action, 0) + 1
+            
+            # Count by severity
+            severity = attack.get('severity', 'Low')
+            attacks_by_severity[severity] = attacks_by_severity.get(severity, 0) + 1
+            
+            # Count by IP
+            ip = attack.get('ip', 'Unknown')
+            ip_attack_counts[ip] = ip_attack_counts.get(ip, 0) + 1
+        
+        # Get top attacking IPs
+        top_attacking_ips = sorted(ip_attack_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        return {
+            'total_attacks': len(recent_attacks),
+            'attacks_by_type': attacks_by_type,
+            'attacks_by_action': attacks_by_action,
+            'attacks_by_severity': attacks_by_severity,
+            'top_attacking_ips': [{'ip': ip, 'count': count} for ip, count in top_attacking_ips]
+        }
 
     def run(self, host='0.0.0.0', port=8080, debug=False):
         """Run the enhanced dashboard server."""
