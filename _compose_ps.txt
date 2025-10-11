@@ -1,0 +1,10 @@
+NAME                 IMAGE                                                  COMMAND                  SERVICE         CREATED          STATUS                    PORTS
+as-aurora-shield-1   as-aurora-shield                                       "python main.py"         aurora-shield   33 seconds ago   Up 31 seconds (healthy)   0.0.0.0:8080->8080/tcp
+as-client-1          as-client                                              "python client.py"       client          32 seconds ago   Up 30 seconds             
+as-demo-webapp-1     nginx:alpine                                           "/docker-entrypoint.…"   demo-webapp     33 seconds ago   Up 32 seconds             0.0.0.0:80->80/tcp
+as-elasticsearch-1   docker.elastic.co/elasticsearch/elasticsearch:7.17.0   "/bin/tini -- /usr/l…"   elasticsearch   33 seconds ago   Up 32 seconds (healthy)   0.0.0.0:9200->9200/tcp, 9300/tcp
+as-grafana-1         grafana/grafana:latest                                 "/run.sh"                grafana         33 seconds ago   Up 31 seconds             0.0.0.0:3000->3000/tcp
+as-kibana-1          docker.elastic.co/kibana/kibana:7.17.0                 "/bin/tini -- /usr/l…"   kibana          33 seconds ago   Up 31 seconds             0.0.0.0:5601->5601/tcp
+as-load-balancer-1   nginx:alpine                                           "/docker-entrypoint.…"   load-balancer   32 seconds ago   Up 30 seconds             0.0.0.0:8090->80/tcp
+as-prometheus-1      prom/prometheus:latest                                 "/bin/prometheus --c…"   prometheus      33 seconds ago   Up 32 seconds             0.0.0.0:9090->9090/tcp
+as-redis-1           redis:alpine                                           "docker-entrypoint.s…"   redis           33 seconds ago   Up 32 seconds (healthy)   0.0.0.0:6379->6379/tcp

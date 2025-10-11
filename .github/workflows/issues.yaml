@@ -1,0 +1,158 @@
+name: Create GitHub Issues from YAML
+
+'on':
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (will not create issues)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: |
+          pip install PyYAML requests
+      
+      - name: Create issues from YAML
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import yaml
+          import requests
+          import json
+          
+          def create_issue(repo, token, title, body, labels, milestone, dry_run=False):
+              """Create a GitHub issue using the GitHub API"""
+              url = f"https://api.github.com/repos/{repo}/issues"
+              headers = {
+                  "Authorization": f"token {token}",
+                  "Accept": "application/vnd.github.v3+json"
+              }
+              data = {
+                  "title": title,
+                  "body": body,
+                  "labels": labels
+              }
+              
+              if dry_run:
+                  print(f"[DRY RUN] Would create issue: {title}")
+                  return True
+              
+              response = requests.post(url, headers=headers, json=data)
+              if response.status_code == 201:
+                  print(f"✅ Created issue: {title}")
+                  return True
+              else:
+                  print(f"❌ Failed to create issue: {title}")
+                  print(f"   Status: {response.status_code}")
+                  print(f"   Response: {response.text}")
+                  return False
+          
+          def create_label(repo, token, name, color, dry_run=False):
+              """Create a label if it doesn't exist"""
+              url = f"https://api.github.com/repos/{repo}/labels"
+              headers = {
+                  "Authorization": f"token {token}",
+                  "Accept": "application/vnd.github.v3+json"
+              }
+              data = {
+                  "name": name,
+                  "color": color
+              }
+              
+              if dry_run:
+                  print(f"[DRY RUN] Would create label: {name}")
+                  return True
+              
+              response = requests.post(url, headers=headers, json=data)
+              if response.status_code == 201:
+                  print(f"✅ Created label: {name}")
+                  return True
+              elif response.status_code == 422:
+                  print(f"⚠️  Label already exists: {name}")
+                  return True
+              else:
+                  print(f"❌ Failed to create label: {name}")
+                  return False
+          
+          def create_milestone(repo, token, title, description, dry_run=False):
+              """Create a milestone if it doesn't exist"""
+              url = f"https://api.github.com/repos/{repo}/milestones"
+              headers = {
+                  "Authorization": f"token {token}",
+                  "Accept": "application/vnd.github.v3+json"
+              }
+              data = {
+                  "title": title,
+                  "description": description
+              }
+              
+              if dry_run:
+                  print(f"[DRY RUN] Would create milestone: {title}")
+                  return True
+              
+              response = requests.post(url, headers=headers, json=data)
+              if response.status_code == 201:
+                  print(f"✅ Created milestone: {title}")
+                  return True
+              elif response.status_code == 422:
+                  print(f"⚠️  Milestone already exists: {title}")
+                  return True
+              else:
+                  print(f"❌ Failed to create milestone: {title}")
+                  return False
+          
+          # Main execution
+          repo = os.environ.get('GITHUB_REPOSITORY')
+          token = os.environ.get('GITHUB_TOKEN')
+          dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          
+          if dry_run:
+              print("🔍 Running in DRY RUN mode - no issues will be created\n")
+          
+          # Load issues data
+          with open('issues-data.yaml', 'r') as f:
+              data = yaml.safe_load(f)
+          
+          # Create labels
+          print("📋 Creating labels...")
+          for label in data.get('labels', []):
+              create_label(repo, token, label['name'], label['color'], dry_run)
+          
+          print("\n📊 Creating milestones...")
+          for milestone in data.get('milestones', []):
+              create_milestone(repo, token, milestone['title'], milestone['description'], dry_run)
+          
+          print("\n📝 Creating issues...")
+          success_count = 0
+          fail_count = 0
+          for issue in data.get('issues', []):
+              if create_issue(repo, token, issue['title'], issue['body'], issue['labels'], issue.get('milestone'), dry_run):
+                  success_count += 1
+              else:
+                  fail_count += 1
+          
+          print(f"\n✅ Summary: {success_count} issues processed, {fail_count} failed")
+          
+          if not dry_run and fail_count > 0:
+              exit(1)
+          EOF

@@ -1,0 +1,24 @@
+# Client container for Demo (formerly attack simulator)
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install requests aiohttp flask
+
+# Copy client scripts and web interface
+COPY docker/client.py /app/client.py
+COPY docker/attack_simulator_web.py /app/attack_simulator_web.py
+COPY docker/templates/ /app/templates/
+
+# Set environment variables
+ENV TARGET_HOST=aurora-shield
+ENV TARGET_PORT=8080
+ENV LB_HOST=load-balancer
+ENV LB_PORT=80
+
+# Expose web interface port
+EXPOSE 5001
+
+# Run the web interface
+CMD ["python", "attack_simulator_web.py"]

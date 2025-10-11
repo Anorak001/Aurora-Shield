@@ -50,7 +50,7 @@ docker-compose down
 
 ### Run Complete Demo Scenario
 ```bash
-docker-compose run --rm attack-simulator
+docker-compose run --rm client
 ```
 
 ### Manual Attack Testing
@@ -76,7 +76,7 @@ curl -X POST http://localhost:8080/api/dashboard/simulate \
 1. **Start Environment**: `docker-compose up -d`
 2. **Open Dashboard**: http://localhost:8080 (admin/admin123)
 3. **Show Protected App**: http://localhost:80
-4. **Run Attack Simulation**: `docker-compose run --rm attack-simulator`
+4. **Run Client Simulation**: `docker-compose run --rm client`
 5. **Monitor in Real-time**: 
    - Dashboard for live stats
    - Kibana for detailed logs
@@ -169,7 +169,7 @@ docker-compose restart aurora-shield
 ```
 
 ### Custom Attack Simulations
-Edit `docker/attack_simulator.py` to add new attack types.
+Edit `docker/client.py` to add new client/traffic patterns.
 
 ### Dashboard Customization
 Modify `aurora_shield/dashboard/web_dashboard.py` for UI changes.

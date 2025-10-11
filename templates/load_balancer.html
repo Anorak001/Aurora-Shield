@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Load Balancer Control Panel</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Roboto+Mono:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* Reset and base */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background-color: #0A0F1C;
+      color: white;
+      font-family: 'Inter', 'Roboto Mono', monospace, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    h1 {
+      font-weight: 900;
+      font-size: 2.5rem;
+      color: #00FF9D;
+      letter-spacing: 0.1em;
+      margin: 0 0 0.25rem 0;
+      text-shadow: 0 0 6px #00FF9D;
+      user-select: none;
+      text-align: center;
+    }
+    h2 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      color: #00E0FF;
+      text-shadow: 0 0 6px #00E0FF;
+    }
+    p.subtitle {
+      color: #00E0FF;
+      font-weight: 500;
+      font-size: 1.15rem;
+      margin: 0 0 3rem 0;
+      text-shadow: 0 0 4px #00E0FF;
+      text-align: center;
+      user-select: none;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      padding: 0.75rem 2rem;
+      cursor: pointer;
+      margin: 0 0.75rem;
+      box-shadow: 0 0 12px transparent;
+      transition: box-shadow 0.3s ease;
+      user-select: none;
+      min-width: 140px;
+    }
+    button:focus {
+      outline: 2px solid white;
+      outline-offset: 3px;
+    }
+    button.restart {
+      background-color: #00FF9D;
+      color: #0A0F1C;
+      box-shadow: 0 0 12px #00FF9D;
+    }
+    button.restart:hover {
+      box-shadow: 0 0 18px #00FF9D;
+    }
+    button.migrate {
+      background-color: #00E0FF;
+      color: #0A0F1C;
+      box-shadow: 0 0 12px #00E0FF;
+    }
+    button.migrate:hover {
+      box-shadow: 0 0 18px #00E0FF;
+    }
+    .btn-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 3rem;
+    }
+    /* Card/table */
+    .ip-card {
+      background: #121A2B;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0, 255, 157, 0.3);
+      padding: 1.25rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      font-weight: 600;
+      color: #00FF9D;
+      user-select: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      color: white;
+      font-family: 'Roboto Mono', monospace;
+      font-weight: 500;
+    }
+    td {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #203040;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #00FF9D;
+      box-shadow: 0 0 8px #00FF9D;
+      flex-shrink: 0;
+    }
+    /* Footer */
+    footer {
+      margin-top: auto;
+      padding: 1rem;
+      color: #666666;
+      font-size: 0.9rem;
+      user-select: none;
+    }
+    /* Modal overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(10, 15, 28, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    /* Modal dialog */
+    .modal {
+      background-color: #0A0F1C;
+      border-radius: 12px;
+      padding: 2rem 2rem 2.5rem;
+      box-shadow: 0 0 20px var(--accent-color), 0 0 30px var(--accent-color-80);
+      max-width: 360px;
+      width: 90%;
+      color: white;
+      font-family: 'Inter', 'Roboto Mono', monospace, sans-serif;
+      user-select: none;
+      position: relative;
+    }
+    .modal h3 {
+      margin: 0 0 1.25rem 0;
+      font-weight: 900;
+      color: var(--accent-color);
+      text-shadow: 0 0 8px var(--accent-color);
+    }
+    .modal label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: white;
+    }
+    select {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid;
+      font-family: 'Roboto Mono', monospace;
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      background-color: #0A0F1C;
+      color: white;
+      box-shadow: 0 0 8px var(--accent-color);
+      cursor: pointer;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    select:focus {
+      outline: none;
+      border-color: white;
+    }
+    /* Modal buttons */
+    .modal button {
+      width: 100%;
+      padding: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 12px transparent;
+      transition: box-shadow 0.3s ease;
+      user-select: none;
+    }
+    .modal button.confirm-restart {
+      background-color: #00FF9D;
+      color: #0A0F1C;
+      box-shadow: 0 0 12px #00FF9D;
+    }
+    .modal button.confirm-restart:hover {
+      box-shadow: 0 0 18px #00FF9D;
+    }
+    .modal button.confirm-migrate {
+      background-color: #00E0FF;
+      color: #0A0F1C;
+      box-shadow: 0 0 12px #00E0FF;
+    }
+    .modal button.confirm-migrate:hover {
+      box-shadow: 0 0 18px #00E0FF;
+    }
+    /* Close button */
+    .modal .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 18px;
+      background: transparent;
+      border: none;
+      font-size: 1.4rem;
+      color: white;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 700;
+      transition: color 0.3s ease;
+    }
+    .modal .close-btn:hover {
+      color: var(--accent-color);
+    }
+    /* Responsive */
+    @media (max-width: 400px) {
+      button {
+        margin: 0.5rem 0;
+        min-width: 100%;
+      }
+      .btn-container {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Load Balancer Control Panel</h1>
+    <p class="subtitle">Monitor and manage your CDN nodes securely.</p>
+  </header>
+
+  <div class="btn-container" role="region" aria-label="Control buttons">
+    <button class="restart" id="openRestart" aria-haspopup="dialog" aria-controls="restartModal">
+      Restart CDN
+    </button>
+    <button class="migrate" id="openMigrate" aria-haspopup="dialog" aria-controls="migrateModal">
+      Migrate CDN
+    </button>
+  </div>
+
+  <section class="ip-card" aria-label="Accepted IP Addresses">
+    <h2>Accepted IP Addresses</h2>
+    <table>
+      <tbody>
+        <tr>
+          <td><span class="status-dot" aria-label="Active connection"></span>192.168.1.1</td>
+        </tr>
+        <tr>
+          <td><span class="status-dot" aria-label="Active connection"></span>10.0.0.5</td>
+        </tr>
+        <tr>
+          <td><span class="status-dot" aria-label="Active connection"></span>172.16.0.10</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Restart Modal -->
+  <div class="modal-overlay" id="restartModal" role="dialog" aria-modal="true" aria-labelledby="restartTitle" tabindex="-1" aria-hidden="true">
+    <div class="modal" style="--accent-color:#00FF9D; --accent-color-80:#00FF9DCC">
+      <button class="close-btn" aria-label="Close Restart modal" id="closeRestart">&times;</button>
+      <h3 id="restartTitle">Restart CDN</h3>
+      <label for="restartSelect">Select CDN to restart:</label>
+      <select id="restartSelect" aria-describedby="restartDesc">
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+      <button class="confirm-restart" id="confirmRestart">Confirm Restart</button>
+    </div>
+  </div>
+
+  <!-- Migrate Modal -->
+  <div class="modal-overlay" id="migrateModal" role="dialog" aria-modal="true" aria-labelledby="migrateTitle" tabindex="-1" aria-hidden="true">
+    <div class="modal" style="--accent-color:#00E0FF; --accent-color-80:#00E0FFCC">
+      <button class="close-btn" aria-label="Close Migrate modal" id="closeMigrate">&times;</button>
+      <h3 id="migrateTitle">Migrate CDN</h3>
+      <label for="sourceSelect">Source CDN:</label>
+      <select id="sourceSelect">
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+
+      <label for="destinationSelect">Destination CDN:</label>
+      <select id="destinationSelect">
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+
+      <button class="confirm-migrate" id="confirmMigrate">Confirm Migration</button>
+    </div>
+  </div>
+
+  <footer role="contentinfo">
+    © 2025 CyberEdge Networks 🔒
+  </footer>
+
+  <script>
+    // Get modal elements and buttons
+    const restartModal = document.getElementById('restartModal');
+    const migrateModal = document.getElementById('migrateModal');
+    const openRestartBtn = document.getElementById('openRestart');
+    const openMigrateBtn = document.getElementById('openMigrate');
+    const closeRestartBtn = document.getElementById('closeRestart');
+    const closeMigrateBtn = document.getElementById('closeMigrate');
+
+    const confirmRestartBtn = document.getElementById('confirmRestart');
+    const confirmMigrateBtn = document.getElementById('confirmMigrate');
+    const restartSelect = document.getElementById('restartSelect');
+    const sourceSelect = document.getElementById('sourceSelect');
+    const destinationSelect = document.getElementById('destinationSelect');
+
+    // Open modals
+    openRestartBtn.addEventListener('click', () => {
+      restartModal.classList.add('active');
+      restartModal.setAttribute('aria-hidden', 'false');
+      restartModal.querySelector('select').focus();
+    });
+
+    openMigrateBtn.addEventListener('click', () => {
+      migrateModal.classList.add('active');
+      migrateModal.setAttribute('aria-hidden', 'false');
+      migrateModal.querySelector('select').focus();
+      updateDestinationOptions();
+    });
+
+    // Close modals
+    function closeRestart() {
+      restartModal.classList.remove('active');
+      restartModal.setAttribute('aria-hidden', 'true');
+      openRestartBtn.focus();
+    }
+    function closeMigrate() {
+      migrateModal.classList.remove('active');
+      migrateModal.setAttribute('aria-hidden', 'true');
+      openMigrateBtn.focus();
+    }
+    closeRestartBtn.addEventListener('click', closeRestart);
+    closeMigrateBtn.addEventListener('click', closeMigrate);
+
+    // Close modals if clicking outside modal content
+    restartModal.addEventListener('click', (e) => {
+      if (e.target === restartModal) closeRestart();
+    });
+    migrateModal.addEventListener('click', (e) => {
+      if (e.target === migrateModal) closeMigrate();
+    });
+
+    // Confirm buttons actions
+    confirmRestartBtn.addEventListener('click', async () => {
+      const selectedCDN = restartSelect.value;
+      confirmRestartBtn.textContent = 'Restarting...';
+      confirmRestartBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/cdn/restart', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ cdn: selectedCDN })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          alert(`✅ Restart successful for ${selectedCDN}\nTimestamp: ${result.timestamp || 'N/A'}`);
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (error) {
+        alert(`❌ Restart failed for ${selectedCDN}: ${error.message}`);
+      } finally {
+        confirmRestartBtn.textContent = 'Confirm Restart';
+        confirmRestartBtn.disabled = false;
+        closeRestart();
+      }
+    });
+
+    confirmMigrateBtn.addEventListener('click', async () => {
+      const sourceCDN = sourceSelect.value;
+      const destinationCDN = destinationSelect.value;
+      confirmMigrateBtn.textContent = 'Migrating...';
+      confirmMigrateBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/cdn/migrate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            source: sourceCDN, 
+            destination: destinationCDN 
+          })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          alert(`✅ Migration successful from ${sourceCDN} to ${destinationCDN}\nTimestamp: ${result.timestamp || 'N/A'}`);
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (error) {
+        alert(`❌ Migration failed: ${error.message}`);
+      } finally {
+        confirmMigrateBtn.textContent = 'Confirm Migration';
+        confirmMigrateBtn.disabled = false;
+        closeMigrate();
+      }
+    });
+
+    // Update destination options dynamically to disallow same source and destination
+    function updateDestinationOptions() {
+      const sourceVal = sourceSelect.value;
+      const options = Array.from(destinationSelect.options);
+      options.forEach(opt => {
+        opt.disabled = (opt.value === sourceVal);
+      });
+      // If currently selected destination matches source, change destination select value to first enabled option
+      if (destinationSelect.value === sourceVal) {
+        const firstEnabled = options.find(opt => !opt.disabled);
+        if (firstEnabled) destinationSelect.value = firstEnabled.value;
+      }
+    }
+    sourceSelect.addEventListener('change', updateDestinationOptions);
+
+    // Initialize on page load
+    updateDestinationOptions();
+  </script>
+</body>
+</html>

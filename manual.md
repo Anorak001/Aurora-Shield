@@ -95,7 +95,7 @@ python main.py
 
 ```
 
-3) Run the Docker demo (if you want the full stack: Nginx demo app, load balancer, Prometheus, Grafana, Elasticsearch, Kibana, attack-simulator):
+3) Run the Docker demo (if you want the full stack: Nginx demo app, load balancer, Prometheus, Grafana, Elasticsearch, Kibana, client):
 
 ```powershell
 docker-compose up --build

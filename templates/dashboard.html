@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield Service Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            background: linear-gradient(45deg, #00ff88, #00aaff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .service-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.2);
+        }
+        
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .service-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+        
+        .status-running { background-color: #00ff88; }
+        .status-stopped { background-color: #ff4757; }
+        .status-starting { background-color: #ffa502; }
+        .status-healthy { background-color: #00ff88; }
+        .status-unhealthy { background-color: #ff6b6b; }
+        .status-unknown { background-color: #gray; }
+        
+        .service-info {
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .service-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #00ff88, #00aaff);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .client-controls {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .logs-section {
+            margin-top: 2rem;
+        }
+        
+        .logs-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #00ff88, #00aaff);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(0, 255, 136, 0.5);
+        }
+        
+        .url-links {
+            margin-top: 1rem;
+        }
+        
+        .url-link {
+            display: inline-block;
+            margin: 0.25rem 0.5rem 0.25rem 0;
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 170, 255, 0.2);
+            border: 1px solid rgba(0, 170, 255, 0.5);
+            border-radius: 4px;
+            color: #00aaff;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+        
+        .url-link:hover {
+            background: rgba(0, 170, 255, 0.3);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Aurora Shield Service Dashboard</h1>
+        <p>Monitor and manage your Aurora Shield services</p>
+    </div>
+    
+    <div class="container">
+        <div class="services-grid" id="servicesGrid">
+            <!-- Services will be populated by JavaScript -->
+        </div>
+        
+        <div class="client-controls">
+            <h3>🚨 Client Simulator Controls</h3>
+            <p>Start traffic simulation and attack testing</p>
+            <div class="service-actions">
+                <button class="btn btn-primary" onclick="startClient()">Start Client Simulator</button>
+                <button class="btn btn-secondary" onclick="showClientLogs()">View Client Logs</button>
+            </div>
+        </div>
+        
+        <div class="logs-section" id="logsSection" style="display: none;">
+            <h3>Service Logs</h3>
+            <div class="logs-container" id="logsContainer"></div>
+            <button class="btn btn-secondary" onclick="hideLogs()">Close Logs</button>
+        </div>
+    </div>
+    
+    <button class="refresh-btn" onclick="refreshStatus()" title="Refresh Status">
+        🔄
+    </button>
+
+    <script>
+        let services = {{ services | tojsonfilter }};
+        let statusData = {};
+        
+        function refreshStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    statusData = data;
+                    updateServiceCards();
+                })
+                .catch(error => console.error('Error fetching status:', error));
+        }
+        
+        function updateServiceCards() {
+            const grid = document.getElementById('servicesGrid');
+            grid.innerHTML = '';
+            
+            for (const [serviceKey, serviceInfo] of Object.entries(services)) {
+                const status = statusData[serviceKey] || {};
+                const card = createServiceCard(serviceKey, serviceInfo, status);
+                grid.appendChild(card);
+            }
+        }
+        
+        function createServiceCard(serviceKey, serviceInfo, status) {
+            const card = document.createElement('div');
+            card.className = 'service-card';
+            
+            const containerStatus = status.status || 'unknown';
+            const healthStatus = status.health || 'unknown';
+            
+            const portInfo = serviceInfo.port ? `Port: ${serviceInfo.port}` : 'Internal service';
+            const urlLink = serviceInfo.port && serviceInfo.port !== 6379 ? 
+                `<a href="http://localhost:${serviceInfo.port}" target="_blank" class="url-link">Open Service</a>` : '';
+            
+            card.innerHTML = `
+                <div class="service-header">
+                    <div class="service-name">
+                        ${serviceInfo.name}
+                        <span class="status-indicator status-${containerStatus}"></span>
+                    </div>
+                    <div>
+                        Health: <span class="status-indicator status-${healthStatus}"></span>
+                    </div>
+                </div>
+                <div class="service-info">${serviceInfo.description}</div>
+                <div class="service-info">${portInfo}</div>
+                <div class="service-info">Status: ${containerStatus}</div>
+                ${status.response_time ? `<div class="service-info">Response: ${(status.response_time * 1000).toFixed(0)}ms</div>` : ''}
+                <div class="url-links">
+                    ${urlLink}
+                </div>
+                <div class="service-actions">
+                    <button class="btn btn-primary" onclick="restartService('${serviceKey}')">Restart</button>
+                    <button class="btn btn-secondary" onclick="showLogs('${serviceKey}')">Logs</button>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function restartService(service) {
+            fetch(`/api/restart/${service}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`${service} restarted successfully`);
+                        setTimeout(refreshStatus, 2000);
+                    } else {
+                        alert(`Error restarting ${service}: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error restarting service');
+                });
+        }
+        
+        function showLogs(service) {
+            fetch(`/api/logs/${service}`)
+                .then(response => response.json())
+                .then(data => {
+                    const logsSection = document.getElementById('logsSection');
+                    const logsContainer = document.getElementById('logsContainer');
+                    logsContainer.textContent = data.logs || data.error || 'No logs available';
+                    logsSection.style.display = 'block';
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error fetching logs');
+                });
+        }
+        
+        function hideLogs() {
+            document.getElementById('logsSection').style.display = 'none';
+        }
+        
+        function startClient() {
+            fetch('/api/client/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Client simulator started');
+                        showLogs('client');
+                    } else {
+                        alert(`Error starting client: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error starting client simulator');
+                });
+        }
+        
+        function showClientLogs() {
+            showLogs('client');
+        }
+        
+        // Auto-refresh every 10 seconds
+        setInterval(refreshStatus, 10000);
+        
+        // Initial load
+        refreshStatus();
+    </script>
+</body>
+</html>
