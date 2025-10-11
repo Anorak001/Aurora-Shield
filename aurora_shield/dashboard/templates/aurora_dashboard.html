@@ -285,6 +285,71 @@
         .attack-slowloris { background: rgba(255,165,2,0.2); color: var(--warning); }
         .attack-http-flood { background: rgba(155,124,255,0.2); color: var(--accent); }
 
+        /* Action indicators */
+        .action-taken {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .action-sinkholed { background: rgba(255,165,2,0.3); color: #FFB84D; }
+        .action-blackholed { background: rgba(255,71,87,0.3); color: #FF6B7D; }
+        .action-quarantined { background: rgba(126,224,246,0.3); color: #7EE0F6; }
+        .action-blocked { background: rgba(155,124,255,0.3); color: #9B7CFF; }
+
+        /* Threat Summary Grid */
+        .threat-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .threat-summary-card {
+            background: linear-gradient(135deg, rgba(20,25,47,0.9), rgba(25,30,52,0.8));
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .threat-summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), rgba(126,224,246,0.6));
+            border-radius: 12px 12px 0 0;
+        }
+
+        .threat-count {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .threat-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #dbe6ff;
+            margin-bottom: 4px;
+        }
+
+        .threat-desc {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         /* Status indicators */
         .status-indicator {
             width: 12px;
@@ -936,11 +1001,32 @@
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
-                    <div class="panel-title">🚨 Recent Attack Activity</div>
+                    <div class="panel-title">🚨 Recent Attack Activity & Actions Taken</div>
                     <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
                 </div>
                 <div class="attack-log" id="attackLog">
                     <!-- Attack logs will be populated by JavaScript -->
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <div class="panel-title">🎯 Active Threat Intelligence</div>
+                    <div class="threat-summary-grid">
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="sinkholed-count">0</div>
+                            <div class="threat-label">Sinkholed IPs</div>
+                            <div class="threat-desc">Intelligence gathering</div>
+                        </div>
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="blackholed-count">0</div>
+                            <div class="threat-label">Blackholed IPs</div>
+                            <div class="threat-desc">Complete blocks</div>
+                        </div>
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="quarantined-count">0</div>
+                            <div class="threat-label">Quarantined IPs</div>
+                            <div class="threat-desc">Temporary isolation</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="auto-refresh">
@@ -1269,6 +1355,9 @@
                     // Update attack log
                     updateAttackLog(data.recent_attacks || []);
                     
+                    // Update threat intelligence summary
+                    updateThreatIntelligence();
+                    
                     // Update rate limiting visualization with real IPs
                     updateRateLimitingDisplay(data.performance_metrics?.ip_request_counts || {});
                     
@@ -1296,18 +1385,49 @@
                 return;
             }
 
-            log.innerHTML = attacks.slice(0, 5).map(attack => `
+            log.innerHTML = attacks.slice(0, 8).map(attack => `
                 <div class="attack-log-item">
                     <div>
-                        <span class="attack-type attack-${attack.type.toLowerCase().replace(' ', '-')}">${attack.type}</span>
-                        <span style="margin-left: 12px; color: var(--muted);">${attack.source}</span>
+                        <span class="attack-type attack-${(attack.attack_type || attack.type || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '-')}">${attack.attack_type || attack.type || 'Unknown'}</span>
+                        <span style="margin-left: 12px; color: #dbe6ff; font-weight: 600;">${attack.ip || attack.source}</span>
+                        <span class="action-taken action-${getActionClass(attack.action_taken)}">${attack.action_taken || attack.status}</span>
                     </div>
                     <div>
-                        <span style="color: var(--success); margin-right: 8px;">${attack.status}</span>
                         <span style="color: var(--muted); font-size: 11px;">${formatAttackTimestamp(attack.timestamp)}</span>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function getActionClass(action) {
+            if (!action) return 'blocked';
+            const actionLower = action.toLowerCase();
+            if (actionLower.includes('sinkhole')) return 'sinkholed';
+            if (actionLower.includes('blackhole')) return 'blackholed';
+            if (actionLower.includes('quarantine')) return 'quarantined';
+            return 'blocked';
+        }
+
+        function updateThreatIntelligence() {
+            fetch('/api/dashboard/attacking-ips')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const summary = data.data.sinkhole_summary;
+                        
+                        // Update threat summary cards
+                        document.getElementById('sinkholed-count').textContent = summary.sinkholed_ips || 0;
+                        document.getElementById('blackholed-count').textContent = summary.blackholed_ips || 0;
+                        document.getElementById('quarantined-count').textContent = summary.quarantined_ips || 0;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching threat intelligence:', error);
+                    // Set fallback values
+                    document.getElementById('sinkholed-count').textContent = '0';
+                    document.getElementById('blackholed-count').textContent = '0';
+                    document.getElementById('quarantined-count').textContent = '0';
+                });
         }
 
         function formatAttackTimestamp(timestamp) {

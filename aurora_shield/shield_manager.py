@@ -134,18 +134,25 @@ class AuroraShieldManager:
         if not reputation['allowed']:
             self.blocked_requests += 1
             
+            # Auto-sinkhole IPs with zero reputation for intelligence gathering
+            if reputation['score'] <= 0:
+                sinkhole_manager.auto_sinkhole_zero_reputation(ip_address)
+            
             # Record violation for potential sinkhole escalation
             sinkhole_manager.process_violation(ip_address, 'ip_reputation', severity=reputation.get('severity', 5))
+            
+            # Implement queue fairness to prevent legitimate request starvation
+            sinkhole_manager.implement_queue_fairness()
             
             self.elk_integration.log_event('request_blocked', {
                 'ip': ip_address,
                 'reason': 'ip_reputation',
                 'score': reputation['score']
             })
-            self._log_request_realtime(request_data, 'blocked', 'IP reputation too low')
+            self._log_request_realtime(request_data, 'blocked', f'IP reputation too low (score: {reputation["score"]})')
             return {
                 'allowed': False,
-                'reason': 'IP reputation too low',
+                'reason': f'IP reputation too low (score: {reputation["score"]})',
                 'layer': 'ip_reputation'
             }
         

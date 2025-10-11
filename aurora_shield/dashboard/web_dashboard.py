@@ -99,6 +99,98 @@ class WebDashboard:
             
             return render_template('aurora_dashboard.html', current_user=current_user)
 
+        @self.app.route('/proxy/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+        def proxy_to_load_balancer(path):
+            """Proxy endpoint that filters requests and forwards allowed ones to load balancer"""
+            try:
+                # Extract request information
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                user_agent = request.headers.get('User-Agent', '')
+                request_method = request.method
+                
+                logger.info(f"Filtering request from {client_ip} to /{path}")
+                
+                # Check if IP is in allowed list
+                allowed_ips = getattr(self.shield_manager, 'allowed_ips', [])
+                if client_ip not in allowed_ips:
+                    logger.warning(f"Blocked request from non-allowed IP: {client_ip}")
+                    return jsonify({
+                        'error': 'Access denied',
+                        'reason': 'IP not in allowed list',
+                        'ip': client_ip
+                    }), 403
+                
+                # Check with shield manager
+                should_block = self.shield_manager.check_request(
+                    ip=client_ip,
+                    user_agent=user_agent,
+                    method=request_method,
+                    uri=f'/{path}'
+                )
+                
+                if should_block:
+                    logger.warning(f"Blocked request from {client_ip} by shield manager")
+                    return jsonify({
+                        'error': 'Request blocked by Aurora Shield',
+                        'reason': 'Security policy violation',
+                        'ip': client_ip
+                    }), 403
+                
+                # Forward allowed request to load balancer
+                load_balancer_url = f'http://load-balancer:8090/{path}'
+                
+                # Prepare headers for forwarding
+                forward_headers = dict(request.headers)
+                forward_headers['X-Forwarded-For'] = client_ip
+                forward_headers['X-Aurora-Shield'] = 'filtered'
+                
+                # Forward request based on method
+                if request_method == 'GET':
+                    response = requests.get(
+                        load_balancer_url,
+                        headers=forward_headers,
+                        params=request.args,
+                        timeout=30
+                    )
+                elif request_method == 'POST':
+                    response = requests.post(
+                        load_balancer_url,
+                        headers=forward_headers,
+                        json=request.get_json() if request.is_json else None,
+                        data=request.get_data() if not request.is_json else None,
+                        params=request.args,
+                        timeout=30
+                    )
+                else:
+                    # Handle other methods
+                    response = requests.request(
+                        request_method,
+                        load_balancer_url,
+                        headers=forward_headers,
+                        json=request.get_json() if request.is_json else None,
+                        data=request.get_data() if not request.is_json else None,
+                        params=request.args,
+                        timeout=30
+                    )
+                
+                logger.info(f"Forwarded request from {client_ip} to load balancer: {response.status_code}")
+                
+                # Return the response from load balancer
+                return response.content, response.status_code, dict(response.headers)
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error forwarding request to load balancer: {e}")
+                return jsonify({
+                    'error': 'Load balancer unavailable',
+                    'details': str(e)
+                }), 503
+            except Exception as e:
+                logger.error(f"Error in request proxy: {e}")
+                return jsonify({
+                    'error': 'Internal proxy error',
+                    'details': str(e)
+                }), 500
+
         @self.app.route('/api/shield/check-request', methods=['GET', 'POST', 'PUT', 'DELETE'])
         def check_request_authorization():
             """Authorization endpoint for Nginx auth_request module"""
@@ -216,7 +308,7 @@ class WebDashboard:
 
         @self.app.route('/api/sinkhole/status')
         def get_sinkhole_status():
-            """Get sinkhole/blackhole status"""
+            """Get current sinkhole/blackhole status"""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
             
@@ -231,6 +323,52 @@ class WebDashboard:
             except Exception as e:
                 logger.error(f"Error fetching sinkhole status: {e}")
                 return jsonify({'error': 'Failed to fetch sinkhole status'}), 500
+
+        @self.app.route('/api/dashboard/attacking-ips')
+        def get_attacking_ips():
+            """Get comprehensive attacking IPs and actions taken"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                
+                # Get sinkhole data
+                sinkhole_data = sinkhole_manager.get_all_sinkholed_ips()
+                
+                # Get recent attack activity from live requests
+                live_data = self.shield_manager.get_live_requests()
+                recent_attacks = []
+                
+                # Process recent blocked/sinkholed requests
+                for request_info in live_data.get('recent_requests', [])[-50:]:  # Last 50 requests
+                    if request_info.get('status') in ['blocked', 'sinkholed', 'quarantined']:
+                        action_taken = self._determine_action_taken(request_info.get('ip'), sinkhole_data)
+                        recent_attacks.append({
+                            'ip': request_info.get('ip'),
+                            'timestamp': request_info.get('timestamp'),
+                            'attack_type': request_info.get('reason', 'Unknown'),
+                            'action_taken': action_taken,
+                            'status': request_info.get('status'),
+                            'user_agent': request_info.get('user_agent', 'Unknown')[:50] + '...' if len(request_info.get('user_agent', '')) > 50 else request_info.get('user_agent', 'Unknown')
+                        })
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'sinkhole_summary': sinkhole_data['total_counts'],
+                        'recent_attacks': recent_attacks[-20:],  # Last 20 attacks
+                        'sinkholed_ips': list(sinkhole_data['ip_sinkholes'])[:50],  # Top 50 sinkholed IPs
+                        'blackholed_ips': list(sinkhole_data['ip_blackholes'])[:50],  # Top 50 blackholed IPs
+                        'quarantined_ips': {
+                            ip: info for ip, info in list(sinkhole_data['quarantined_ips'].items())[:20]  # Top 20 quarantined
+                        }
+                    },
+                    'timestamp': time.time()
+                })
+            except Exception as e:
+                logger.error(f"Error fetching attacking IPs: {e}")
+                return jsonify({'error': 'Failed to fetch attacking IP data'}), 500
 
         @self.app.route('/api/sinkhole/add', methods=['POST'])
         def add_to_sinkhole():
@@ -411,6 +549,19 @@ class WebDashboard:
         except Exception as e:
             logger.error(f"Error getting recent attacks: {e}")
             return []
+    
+    def _determine_action_taken(self, ip: str, sinkhole_data: dict) -> str:
+        """Determine what action was taken for a specific IP"""
+        if ip in sinkhole_data.get('ip_blackholes', []):
+            return 'Blackholed (Complete Block)'
+        elif ip in sinkhole_data.get('ip_sinkholes', []):
+            return 'Sinkholed (Intelligence Gathering)'
+        elif ip in sinkhole_data.get('quarantined_ips', {}):
+            quarantine_info = sinkhole_data['quarantined_ips'][ip]
+            time_left = int(quarantine_info.get('time_remaining', 0))
+            return f'Quarantined ({time_left}s remaining)'
+        else:
+            return 'Blocked (Rate Limited)'
 
     def _format_uptime(self, uptime_seconds):
         """Format uptime in a human-readable format."""

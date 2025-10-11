@@ -211,12 +211,16 @@ class SinkholeManager:
             
             subnet = self._get_subnet(ip)
             
-            # Auto-escalation logic
+            logger.info(f"🚨 Violation processed for {ip}: {violation_type} (severity: {severity}, total score: {violation_score})")
+            
+            # Auto-escalation logic with smart decision making
             if violation_score >= self.config['auto_blackhole_threshold']:
+                # High-severity attacks get blackholed (complete block)
                 self.add_to_blackhole(ip, 'ip', f"auto_escalation:{violation_type}:score_{violation_score}")
                 logger.warning(f"🚨 Auto-blackholed {ip} (score: {violation_score})")
                 
-            elif violation_score >= self.config['auto_sinkhole_threshold']:
+            elif violation_score >= self.config['auto_sinkhole_threshold'] or self._should_sinkhole(ip, violation_type):
+                # Medium-severity or intelligence-worthy attacks get sinkholed
                 self.add_to_sinkhole(ip, 'ip', f"auto_escalation:{violation_type}:score_{violation_score}")
                 logger.warning(f"🕳️ Auto-sinkholed {ip} (score: {violation_score})")
                 
@@ -238,6 +242,41 @@ class SinkholeManager:
             if subnet_violations >= 20:  # Multiple IPs from same subnet
                 self.add_to_sinkhole(subnet, 'subnet', f"subnet_pattern:{subnet_violations}_violations")
                 logger.warning(f"🕳️ Auto-sinkholed subnet {subnet} ({subnet_violations} violations)")
+    
+    def _should_sinkhole(self, ip: str, violation_type: str) -> bool:
+        """
+        Smart decision engine for determining sinkhole vs block actions
+        """
+        # Sinkhole attack types that provide valuable intelligence
+        intelligence_worthy_attacks = [
+            'brute_force', 'sql_injection', 'xss_attempt', 'file_inclusion',
+            'directory_traversal', 'malware_download', 'c2_communication',
+            'ip_reputation'  # Zero reputation IPs for intelligence gathering
+        ]
+        
+        # Block simple volume attacks immediately
+        volume_attacks = [
+            'ddos_flood', 'syn_flood', 'udp_flood', 'icmp_flood', 'http_flood'
+        ]
+        
+        if violation_type in intelligence_worthy_attacks:
+            return True  # Sinkhole for intelligence
+        elif violation_type in volume_attacks:
+            return False  # Block immediately
+        else:
+            # Default: sinkhole for analysis unless it's a repeat offender
+            violation_count = len(self.behavior_patterns.get(ip, []))
+            return violation_count < 10  # Sinkhole first 10 violations, then block
+    
+    def auto_sinkhole_zero_reputation(self, ip: str):
+        """
+        Automatically sinkhole IPs with zero reputation for intelligence gathering
+        """
+        if ip not in self.ip_sinkholes and ip not in self.ip_blackholes:
+            self.add_to_sinkhole(ip, 'ip', 'auto_zero_reputation:intelligence_gathering')
+            logger.info(f"🕳️ Auto-sinkholed {ip} due to zero reputation")
+            return True
+        return False
 
     def _generate_sinkhole_response(self, ip: str, user_agent: str = None) -> Dict:
         """Generate appropriate sinkhole response based on request characteristics"""
@@ -494,6 +533,90 @@ retry_after=60
                 },
                 'statistics': self.stats.copy()
             }
+    
+    def get_all_sinkholed_ips(self) -> Dict:
+        """Get comprehensive list of all sinkholed IPs and subnets"""
+        with self.lock:
+            return {
+                'ip_sinkholes': list(self.ip_sinkholes),
+                'subnet_sinkholes': list(self.subnet_sinkholes),
+                'ip_blackholes': list(self.ip_blackholes),
+                'subnet_blackholes': list(self.subnet_blackholes),
+                'quarantined_ips': {
+                    ip: {
+                        'until': info['until'],
+                        'reason': info['reason'],
+                        'violations': info['violations'],
+                        'time_remaining': max(0, info['until'] - time.time())
+                    }
+                    for ip, info in self.quarantine.items()
+                    if time.time() < info['until']
+                },
+                'total_counts': {
+                    'sinkholed_ips': len(self.ip_sinkholes),
+                    'sinkholed_subnets': len(self.subnet_sinkholes),
+                    'blackholed_ips': len(self.ip_blackholes),
+                    'blackholed_subnets': len(self.subnet_blackholes),
+                    'quarantined_ips': len([ip for ip, info in self.quarantine.items() if time.time() < info['until']])
+                }
+            }
+    
+    def get_quarantine_queue_status(self) -> Dict:
+        """Get quarantine queue status and management info"""
+        with self.lock:
+            current_time = time.time()
+            active_quarantine = {
+                ip: info for ip, info in self.quarantine.items()
+                if current_time < info['until']
+            }
+            
+            # Calculate queue priority metrics
+            queue_load = len(active_quarantine)
+            high_priority_count = len([
+                ip for ip, info in active_quarantine.items()
+                if info['violations'] >= 5
+            ])
+            
+            return {
+                'queue_size': queue_load,
+                'high_priority_offenders': high_priority_count,
+                'avg_quarantine_time': sum(
+                    info['until'] - current_time for info in active_quarantine.values()
+                ) / max(1, len(active_quarantine)),
+                'queue_status': 'high' if queue_load > 50 else 'normal' if queue_load > 20 else 'low',
+                'active_quarantine': active_quarantine
+            }
+    
+    def implement_queue_fairness(self):
+        """
+        Implement queue fairness to prevent legitimate requests from being starved
+        """
+        with self.lock:
+            current_time = time.time()
+            queue_status = self.get_quarantine_queue_status()
+            
+            # If queue is overloaded, escalate repeat offenders to free up space
+            if queue_status['queue_size'] > 100:  # Queue too large
+                logger.warning(f"🚨 Quarantine queue overloaded ({queue_status['queue_size']} entries), implementing fairness measures")
+                
+                # Escalate repeat offenders (5+ violations) to sinkhole
+                escalated_count = 0
+                for ip, info in list(self.quarantine.items()):
+                    if info['violations'] >= 5:
+                        del self.quarantine[ip]
+                        self.add_to_sinkhole(ip, 'ip', f"queue_management:repeat_offender:{info['violations']}_violations")
+                        escalated_count += 1
+                        logger.info(f"🕳️ Escalated {ip} to sinkhole due to queue management (violations: {info['violations']})")
+                
+                # If still overloaded, reduce quarantine time for low-severity offenders
+                if len(self.quarantine) > 75:
+                    for ip, info in self.quarantine.items():
+                        if info['violations'] <= 2 and info['until'] - current_time > 1800:  # More than 30 min left
+                            info['until'] = current_time + 900  # Reduce to 15 minutes
+                
+                logger.info(f"🎯 Queue fairness implemented: escalated {escalated_count} repeat offenders")
+                
+            return queue_status
 
 
 # Global sinkhole manager instance
