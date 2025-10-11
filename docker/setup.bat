@@ -107,7 +107,6 @@ echo [SUCCESS] Aurora Shield Demo Environment is ready!
 echo.
 echo === Main Access Points ===
 echo    Aurora Shield Dashboard: http://localhost:8080
-echo    Service Management Dashboard: http://localhost:5000
 echo    Login: admin/admin123 or user/user123
 echo.
 echo === CDN Services (Content Delivery Network) ===
@@ -148,6 +147,5 @@ echo.
 echo === Management Commands ===
 echo    Stop everything: docker-compose down
 echo    View logs: docker-compose logs -f [service-name]
-echo    Service dashboard: Access at http://localhost:5000
 echo.
 pause

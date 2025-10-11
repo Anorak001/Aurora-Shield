@@ -179,6 +179,37 @@ class AuroraShieldManager:
             'result': result
         }
     
+    def get_stats(self):
+        """Get simplified statistics for dashboard."""
+        all_stats = self.get_all_stats()
+        return {
+            'requests_per_second': self.total_requests / max((time.time() - self.start_time), 1),
+            'threats_blocked': self.blocked_requests,
+            'active_connections': all_stats.get('monitored_ips', 0),
+            'system_health': 99.9,  # Could be calculated based on component status
+            'recent_attacks': []  # Could be retrieved from logs
+        }
+    
+    def check_request(self, ip, user_agent, method, uri):
+        """Check if a request should be blocked."""
+        try:
+            # Simple request data structure
+            request_data = {
+                'ip': ip,
+                'user_agent': user_agent,
+                'method': method,
+                'uri': uri,
+                'timestamp': time.time()
+            }
+            
+            # Process through Aurora Shield
+            result = self.process_request(request_data)
+            return result.get('action') == 'block'
+            
+        except Exception as e:
+            logger.error(f"Error checking request: {e}")
+            return False  # Default to allow if there's an error
+    
     def get_all_stats(self):
         """Get statistics from all components."""
         return {

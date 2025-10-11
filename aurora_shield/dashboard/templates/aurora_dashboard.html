@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield - DDoS Protection Dashboard</title>
+    <style>
+        /* Reset & base */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html,body { height: 100%; }
+
+        /* Aurora Shield dark theme colors - matching attack simulator */
+        :root{
+            --bg-900: #0b1220; /* page background */
+            --bg-800: #0f1726; /* card outer */
+            --bg-700: #121627; /* card inner */
+            --panel: linear-gradient(180deg, rgba(16,20,35,0.85), rgba(12,14,24,0.7));
+            --accent: #9b7cff; /* soft purple */
+            --accent-2: #7ee0f6; /* teal highlight */
+            --success: #00ff88;
+            --warning: #ffa502;
+            --danger: #ff4757;
+            --muted: #98a0b3;
+            --glass: rgba(255,255,255,0.03);
+            --card-glow: rgba(123, 87, 232, 0.12);
+        }
+
+        body{
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(1000px 400px at 10% 10%, rgba(123,87,232,0.06), transparent 10%),
+                        radial-gradient(800px 300px at 90% 90%, rgba(53,60,188,0.04), transparent 12%),
+                        var(--bg-900);
+            color: #dbe6ff;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            min-height:100vh;
+        }
+
+        .container{ max-width:1400px; margin:0 auto; padding: 24px; }
+
+        /* Header */
+        .header{ text-align:left; margin-bottom:32px; }
+        .header h1{ font-size:32px; color:var(--accent); letter-spacing:0.4px; margin-bottom: 8px; }
+        .header p{ color:var(--muted); margin-top:6px; font-size: 16px; }
+
+        /* Auth section */
+        .auth-section {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:24px;
+            margin-bottom:24px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+            text-align: center;
+        }
+
+        .auth-section::before {
+            content: '';
+            height:4px; display:block; width:100%;
+            background: linear-gradient(90deg, rgba(155,124,255,0.9), rgba(126,224,246,0.6));
+            border-radius: 12px 12px 0 0; margin-bottom:16px; 
+            box-shadow: 0 6px 18px rgba(124,79,255,0.08) inset;
+        }
+
+        .login-form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #dbe6ff;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(155,124,255,0.2);
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: linear-gradient(180deg, rgba(20,24,40,0.4), rgba(10,12,20,0.3));
+            border-radius: 12px;
+            padding: 6px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            letter-spacing: 0.4px;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            color: #07102a;
+            box-shadow: 0 4px 12px rgba(155,124,255,0.3);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.04);
+            color: #dbe6ff;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Panel styles (cards) */
+        .status-panel,
+        .mitigation-panel,
+        .monitoring-panel,
+        .config-panel {
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:24px;
+            margin-bottom:24px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        /* Small accent stripe on panels */
+        .status-panel::before,
+        .mitigation-panel::before,
+        .monitoring-panel::before,
+        .config-panel::before {
+            content: '';
+            height:4px; display:block; width:100%;
+            background: linear-gradient(90deg, rgba(155,124,255,0.9), rgba(126,224,246,0.6));
+            border-radius: 12px 12px 0 0; margin-bottom:16px; 
+            box-shadow: 0 6px 18px rgba(124,79,255,0.08) inset;
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Stats Grid */
+        .stats-grid{ 
+            display:grid; 
+            grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); 
+            gap:16px; 
+            margin-bottom:16px; 
+        }
+
+        .stat-card{
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius:12px; padding:20px; text-align:center;
+            position:relative; overflow:hidden; border:1px solid rgba(255,255,255,0.03);
+            box-shadow: 0 8px 24px rgba(2,6,20,0.6);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card::after{
+            content:''; position:absolute; right:-40%; top:-40%; width:260px; height:260px; border-radius:50%;
+            background: radial-gradient(circle at 30% 30%, rgba(155,124,255,0.06), transparent 35%);
+            transform: rotate(15deg);
+        }
+
+        .stat-value{ font-size:28px; font-weight:700; color:var(--accent); margin-bottom:8px; position: relative; z-index: 1; }
+        .stat-label{ color:var(--muted); font-size:13px; font-weight: 500; position: relative; z-index: 1; }
+
+        /* Buttons */
+        .btn{ 
+            padding:12px 24px; 
+            border-radius:8px; 
+            cursor:pointer; 
+            font-weight:600; 
+            border:none; 
+            letter-spacing:0.4px; 
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .btn-primary{ 
+            background: linear-gradient(90deg,var(--accent), var(--accent-2)); 
+            color:#07102a; 
+        }
+        .btn-primary:hover{ filter:brightness(1.1); transform: translateY(-1px); }
+
+        .btn-secondary{ 
+            background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)); 
+            color: #dbe6ff; 
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .btn-secondary:hover{ 
+            background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08)); 
+            transform: translateY(-1px);
+        }
+
+        .btn-danger{ 
+            background: linear-gradient(90deg,#ff758c,#dc3545); 
+            color:white; 
+        }
+        .btn-danger:hover{ filter:brightness(0.95); transform: translateY(-1px); }
+
+        .btn-success{ 
+            background: linear-gradient(90deg,var(--success),#00d977); 
+            color:#07102a; 
+        }
+        .btn-success:hover{ filter:brightness(1.1); transform: translateY(-1px); }
+
+        /* Attack Log */
+        .attack-log {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.03);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .attack-log-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 13px;
+            color: #dbe6ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .attack-log-item:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .attack-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .attack-ddos { background: rgba(255,71,87,0.2); color: var(--danger); }
+        .attack-slowloris { background: rgba(255,165,2,0.2); color: var(--warning); }
+        .attack-http-flood { background: rgba(155,124,255,0.2); color: var(--accent); }
+
+        /* Status indicators */
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        .status-active { background-color: var(--success); box-shadow: 0 0 12px rgba(0,255,136,0.4); }
+        .status-inactive { background-color: var(--danger); box-shadow: 0 0 12px rgba(255,71,87,0.4); }
+        .status-warning { background-color: var(--warning); box-shadow: 0 0 12px rgba(255,165,2,0.4); }
+
+        /* Mitigation controls */
+        .mitigation-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .mitigation-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.03);
+            transition: transform 0.2s ease;
+        }
+
+        .mitigation-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .mitigation-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mitigation-description {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        /* Refresh Button */
+        .refresh-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, var(--accent), var(--accent-2));
+            border: none;
+            color: #07102a;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(155,124,255,0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.1) rotate(180deg);
+            box-shadow: 0 12px 32px rgba(155,124,255,0.5);
+        }
+
+        /* Auto refresh indicator */
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 16px;
+        }
+
+        .refresh-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* User info */
+        .user-info {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: var(--muted);
+            font-size: 14px;
+            backdrop-filter: blur(6px);
+        }
+
+        .user-info strong {
+            color: var(--accent);
+        }
+
+        /* Responsive */
+        @media (max-width:768px){ 
+            .stats-grid{ grid-template-columns: repeat(2,1fr); } 
+            .mitigation-controls{ grid-template-columns: 1fr; }
+            .tab-navigation { flex-wrap: wrap; }
+            .user-info { position: static; margin-bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+    {% if current_user %}
+    <div class="user-info">
+        👤 <strong>{{ current_user.name }}</strong> ({{ current_user.role }}) | 
+        <a href="{{ url_for('logout') }}" style="color: var(--accent); text-decoration: none;">Logout</a>
+    </div>
+    {% endif %}
+
+    <div class="container">
+        {% if not current_user %}
+        <!-- Login Section -->
+        <div class="header">
+            <h1>🛡️ Aurora Shield</h1>
+            <p>Advanced DDoS Protection System - Please login to continue</p>
+        </div>
+        
+        <div class="auth-section">
+            <h2 style="color: var(--accent); margin-bottom: 20px;">🔐 Authentication Required</h2>
+            <form method="POST" action="{{ url_for('login') }}" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">🚀 Login</button>
+                
+                <div style="margin-top: 20px; padding: 16px; background: rgba(155,124,255,0.1); border-radius: 8px; border: 1px solid rgba(155,124,255,0.2);">
+                    <h4 style="color: var(--accent); margin-bottom: 8px;">Demo Credentials:</h4>
+                    <p style="color: var(--muted); font-size: 13px;">Admin: <code>admin</code> / <code>admin123</code></p>
+                    <p style="color: var(--muted); font-size: 13px;">User: <code>user</code> / <code>user123</code></p>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <!-- Main Dashboard -->
+        <div class="header">
+            <h1>🛡️ Aurora Shield Dashboard</h1>
+            <p>Real-time DDoS protection monitoring and mitigation controls</p>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+            <button class="tab-btn" onclick="switchTab('mitigation')">🛡️ Mitigation</button>
+            <button class="tab-btn" onclick="switchTab('monitoring')">📡 Monitoring</button>
+            <button class="tab-btn" onclick="switchTab('config')">⚙️ Configuration</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="status-panel">
+                <div class="panel-title">📊 System Status</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="requests-per-sec">0</div>
+                        <div class="stat-label">Requests/sec</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="threats-blocked">0</div>
+                        <div class="stat-label">Threats Blocked</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="protection-level">High</div>
+                        <div class="stat-label">Protection Level</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="system-health">99.9%</div>
+                        <div class="stat-label">System Health</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="uptime">24h 15m</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="active-mitigations">3</div>
+                        <div class="stat-label">Active Mitigations</div>
+                    </div>
+                </div>
+                
+                <div class="panel-title" style="margin-top: 30px;">🚨 Recent Attack Activity</div>
+                <div class="attack-log" id="attackLog">
+                    <!-- Attack logs will be populated by JavaScript -->
+                </div>
+                
+                <div class="auto-refresh">
+                    <span class="refresh-dot"></span>
+                    Auto-refreshing every 5 seconds
+                </div>
+            </div>
+        </div>
+
+        <!-- Mitigation Tab -->
+        <div id="mitigation-tab" class="tab-content">
+            <div class="mitigation-panel">
+                <div class="panel-title">🛡️ Protection Controls</div>
+                <div class="mitigation-controls">
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            ⚡ Rate Limiting
+                            <span class="status-indicator status-active"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Limit request rates per IP to prevent flooding attacks
+                        </div>
+                        <button class="btn btn-success" onclick="toggleMitigation('rate_limiting')">✅ Active</button>
+                    </div>
+                    
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            🧠 Challenge Response
+                            <span class="status-indicator status-active"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Deploy JavaScript challenges to verify legitimate users
+                        </div>
+                        <button class="btn btn-success" onclick="toggleMitigation('challenge_response')">✅ Active</button>
+                    </div>
+                    
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            🔍 IP Reputation
+                            <span class="status-indicator status-active"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Block requests from known malicious IP addresses
+                        </div>
+                        <button class="btn btn-success" onclick="toggleMitigation('ip_reputation')">✅ Active</button>
+                    </div>
+                    
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            🤖 Bot Detection
+                            <span class="status-indicator status-warning"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Identify and filter automated bot traffic patterns
+                        </div>
+                        <button class="btn btn-secondary" onclick="toggleMitigation('bot_detection')">⚠️ Learning</button>
+                    </div>
+                    
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            🚨 Emergency Mode
+                            <span class="status-indicator status-inactive"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Activate maximum protection during severe attacks
+                        </div>
+                        <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate</button>
+                    </div>
+                    
+                    <div class="mitigation-card">
+                        <div class="mitigation-title">
+                            📊 Adaptive Learning
+                            <span class="status-indicator status-active"></span>
+                        </div>
+                        <div class="mitigation-description">
+                            Machine learning-based attack pattern recognition
+                        </div>
+                        <button class="btn btn-success" onclick="toggleMitigation('adaptive_learning')">✅ Active</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monitoring Tab -->
+        <div id="monitoring-tab" class="tab-content">
+            <div class="monitoring-panel">
+                <div class="panel-title">📡 Real-time Monitoring</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="bandwidth-usage">125 MB/s</div>
+                        <div class="stat-label">Bandwidth Usage</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="connection-count">1,247</div>
+                        <div class="stat-label">Active Connections</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="cpu-usage">23%</div>
+                        <div class="stat-label">CPU Usage</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="memory-usage">67%</div>
+                        <div class="stat-label">Memory Usage</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <button class="btn btn-primary" onclick="window.open('http://localhost:3000', '_blank')">📊 Open Grafana</button>
+                    <button class="btn btn-primary" onclick="window.open('http://localhost:5601', '_blank')">📋 Open Kibana</button>
+                    <button class="btn btn-secondary" onclick="exportLogs()">💾 Export Logs</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Tab -->
+        <div id="config-tab" class="tab-content">
+            <div class="config-panel">
+                <div class="panel-title">⚙️ System Configuration</div>
+                <p style="color: var(--muted); margin-bottom: 20px;">Configure Aurora Shield protection parameters and thresholds</p>
+                
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="exportConfig()">💾 Export Config</button>
+                    <button class="btn btn-secondary" onclick="importConfig()">📁 Import Config</button>
+                    <button class="btn btn-success" onclick="resetToDefaults()">🔄 Reset Defaults</button>
+                </div>
+                
+                <div style="padding: 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <h4 style="color: var(--accent); margin-bottom: 16px;">Current Configuration Status</h4>
+                    <p style="color: var(--muted); font-size: 14px;">
+                        Configuration interface allows real-time adjustment of protection parameters.
+                        Changes are applied immediately to the running system.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if current_user %}
+    <button class="refresh-btn" onclick="refreshAllData()" title="Refresh All Data">
+        🔄
+    </button>
+    {% endif %}
+
+    <script>
+        let currentTab = 'overview';
+        let dashboardData = {};
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            currentTab = tabName;
+
+            // Refresh data for the current tab
+            refreshTabData();
+        }
+
+        function refreshTabData() {
+            switch(currentTab) {
+                case 'overview':
+                    updateStats();
+                    break;
+                case 'mitigation':
+                    updateMitigationStatus();
+                    break;
+                case 'monitoring':
+                    updateMonitoringData();
+                    break;
+                case 'config':
+                    updateConfigStatus();
+                    break;
+            }
+        }
+
+        function updateStats() {
+            fetch('/api/dashboard/stats')
+                .then(response => response.json())
+                .then(data => {
+                    dashboardData = data;
+                    
+                    // Update stats
+                    document.getElementById('requests-per-sec').textContent = data.requests_per_second || '0';
+                    document.getElementById('threats-blocked').textContent = data.threats_blocked || '0';
+                    document.getElementById('system-health').textContent = (data.system_health || 99.9) + '%';
+                    document.getElementById('uptime').textContent = data.uptime || '24h 15m';
+                    document.getElementById('active-mitigations').textContent = data.active_mitigations || '3';
+                    
+                    // Update attack log
+                    updateAttackLog(data.recent_attacks || []);
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                    simulateData(); // Fallback to simulated data
+                });
+        }
+
+        function updateAttackLog(attacks) {
+            const log = document.getElementById('attackLog');
+            if (!log) return;
+            
+            if (attacks.length === 0) {
+                // Simulate some recent attacks for demo
+                attacks = [
+                    { timestamp: new Date().toISOString(), type: 'HTTP Flood', source: '192.168.1.100', status: 'Blocked' },
+                    { timestamp: new Date(Date.now() - 30000).toISOString(), type: 'DDoS', source: '10.0.0.50', status: 'Mitigated' },
+                    { timestamp: new Date(Date.now() - 60000).toISOString(), type: 'Slowloris', source: '172.16.0.25', status: 'Blocked' },
+                ];
+            }
+
+            log.innerHTML = attacks.slice(0, 5).map(attack => `
+                <div class="attack-log-item">
+                    <div>
+                        <span class="attack-type attack-${attack.type.toLowerCase().replace(' ', '-')}">${attack.type}</span>
+                        <span style="margin-left: 12px; color: var(--muted);">${attack.source}</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--success); margin-right: 8px;">${attack.status}</span>
+                        <span style="color: var(--muted); font-size: 11px;">${new Date(attack.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateMitigationStatus() {
+            // This would fetch real mitigation status from the API
+            console.log('Updating mitigation status...');
+        }
+
+        function updateMonitoringData() {
+            // Update monitoring metrics
+            document.getElementById('bandwidth-usage').textContent = (Math.random() * 200 + 50).toFixed(0) + ' MB/s';
+            document.getElementById('connection-count').textContent = (Math.random() * 1000 + 500).toFixed(0);
+            document.getElementById('cpu-usage').textContent = (Math.random() * 50 + 15).toFixed(0) + '%';
+            document.getElementById('memory-usage').textContent = (Math.random() * 40 + 50).toFixed(0) + '%';
+        }
+
+        function updateConfigStatus() {
+            // This would fetch configuration status from the API
+            console.log('Updating configuration status...');
+        }
+
+        function simulateData() {
+            // Simulate real-time data for demo purposes
+            const stats = {
+                requests_per_second: Math.floor(Math.random() * 1000 + 100),
+                threats_blocked: Math.floor(Math.random() * 50 + 10),
+                system_health: (99.5 + Math.random() * 0.4).toFixed(1),
+                uptime: '24h ' + Math.floor(Math.random() * 60) + 'm',
+                active_mitigations: Math.floor(Math.random() * 3 + 2)
+            };
+
+            document.getElementById('requests-per-sec').textContent = stats.requests_per_second;
+            document.getElementById('threats-blocked').textContent = stats.threats_blocked;
+            document.getElementById('system-health').textContent = stats.system_health + '%';
+            document.getElementById('uptime').textContent = stats.uptime;
+            document.getElementById('active-mitigations').textContent = stats.active_mitigations;
+        }
+
+        function toggleMitigation(mitigation) {
+            fetch('/api/dashboard/mitigation/' + mitigation, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${mitigation.replace('_', ' ')} toggled successfully`);
+                        updateMitigationStatus();
+                    } else {
+                        alert(`❌ Error toggling ${mitigation}: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert(`⚠️ Mitigation toggle simulated for demo: ${mitigation}`);
+                });
+        }
+
+        function toggleEmergencyMode() {
+            if (confirm('⚠️ Are you sure you want to activate Emergency Mode? This will apply maximum protection but may affect legitimate users.')) {
+                alert('🚨 Emergency Mode activated! All non-essential traffic will be filtered.');
+            }
+        }
+
+        function exportConfig() {
+            fetch('/api/dashboard/config')
+                .then(response => response.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'aurora-shield-config.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('📋 Configuration export simulated for demo');
+                });
+        }
+
+        function importConfig() {
+            alert('📁 Configuration import interface would be implemented here');
+        }
+
+        function resetToDefaults() {
+            if (confirm('🔄 Are you sure you want to reset all settings to defaults?')) {
+                alert('✅ Configuration reset to default values');
+            }
+        }
+
+        function exportLogs() {
+            alert('💾 Log export functionality would be implemented here');
+        }
+
+        function refreshAllData() {
+            refreshTabData();
+            
+            // Add rotation effect to refresh button
+            const btn = document.querySelector('.refresh-btn');
+            if (btn) {
+                btn.style.transform = 'scale(1.1) rotate(360deg)';
+                setTimeout(() => {
+                    btn.style.transform = '';
+                }, 300);
+            }
+        }
+
+        // Auto-refresh functionality
+        function startAutoRefresh() {
+            refreshTabData();
+            setInterval(() => {
+                if (currentTab === 'overview') {
+                    updateStats();
+                } else if (currentTab === 'monitoring') {
+                    updateMonitoringData();
+                }
+            }, 5000);
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if current_user %}
+            startAutoRefresh();
+            {% endif %}
+        });
+    </script>
+</body>
+</html>
