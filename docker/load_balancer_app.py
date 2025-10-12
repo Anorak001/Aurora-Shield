@@ -214,14 +214,14 @@ def direct_cdn(cdn_name):
         stats['errors'] += 1
         return jsonify({'error': f'CDN {cdn_name} unavailable'}), 503
 
-def get_dashboard_allowed_count():
-    """Get allowed requests count from Aurora Shield dashboard stats"""
+def get_aurora_shield_stats():
+    """Get comprehensive statistics from Aurora Shield dashboard"""
     try:
         # Try the public health endpoint first
         response = requests.get('http://aurora-shield:8080/health', timeout=5)
         if response.status_code != 200:
-            logger.warning("Dashboard not reachable")
-            return 0
+            logger.warning("Aurora Shield not reachable")
+            return None
             
         # Try to get stats from dashboard - use session with login
         session = requests.Session()
@@ -235,27 +235,60 @@ def get_dashboard_allowed_count():
             stats_response = session.get('http://aurora-shield:8080/api/dashboard/stats', timeout=5)
             if stats_response.status_code == 200:
                 data = stats_response.json()
-                return data.get('allowed_requests', 0)
+                return {
+                    'total_requests': data.get('total_requests', 0),
+                    'allowed_requests': data.get('allowed_requests', 0), 
+                    'blocked_requests': data.get('blocked_requests', 0),
+                    'rate_limited': data.get('rate_limited', 0),
+                    'sinkholed': data.get('sinkholed', 0),
+                    'request_rate': data.get('request_rate', 0),
+                    'uptime': data.get('uptime', '0h 0m'),
+                    'active_connections': data.get('active_connections', 0),
+                    'reputation_scores': data.get('reputation_scores', {}),
+                    'timestamp': data.get('timestamp')
+                }
                 
     except Exception as e:
-        logger.warning(f"Could not fetch allowed requests count from dashboard: {e}")
+        logger.warning(f"Could not fetch Aurora Shield stats: {e}")
+    return None
+
+def get_dashboard_allowed_count():
+    """Get allowed requests count from Aurora Shield dashboard stats"""
+    aurora_stats = get_aurora_shield_stats()
+    if aurora_stats:
+        return aurora_stats.get('allowed_requests', 0)
     return 0
 
 @app.route('/stats')
 def get_stats():
-    """Get load balancer statistics."""
+    """Get load balancer statistics based on Aurora Shield traffic data."""
     uptime = datetime.now() - stats['start_time']
     
-    # Get allowed requests count from dashboard
-    dashboard_allowed_count = get_dashboard_allowed_count()
+    # Get comprehensive stats from Aurora Shield
+    aurora_stats = get_aurora_shield_stats()
     
-    # Calculate rates
-    total_seconds = uptime.total_seconds()
-    request_rate = stats['requests_total'] / max(total_seconds, 1)
-    
-    # Calculate success rate
-    success_requests = stats['requests_allowed']
-    success_rate = (success_requests / max(stats['requests_total'], 1)) * 100
+    if aurora_stats:
+        # Use Aurora Shield's traffic data
+        total_requests = aurora_stats['total_requests']
+        allowed_requests = aurora_stats['allowed_requests']
+        blocked_requests = aurora_stats['blocked_requests']
+        aurora_request_rate = aurora_stats['request_rate']
+        
+        # Calculate success rate based on Aurora Shield data
+        success_rate = (allowed_requests / max(total_requests, 1)) * 100
+        
+        # Calculate load balancer specific metrics
+        total_seconds = uptime.total_seconds()
+        lb_request_rate = stats['requests_total'] / max(total_seconds, 1)
+        
+    else:
+        # Fallback to local stats if Aurora Shield is unavailable
+        total_requests = stats['requests_total']
+        allowed_requests = stats['requests_allowed']
+        blocked_requests = stats['requests_blocked']
+        aurora_request_rate = stats['requests_total'] / max(uptime.total_seconds(), 1)
+        success_rate = (allowed_requests / max(total_requests, 1)) * 100
+        lb_request_rate = aurora_request_rate
     
     # Get CDN health status
     cdn_health = {}
@@ -268,20 +301,22 @@ def get_stats():
         }
     
     return jsonify({
-        'requests_total': stats['requests_total'],
-        'requests_allowed': dashboard_allowed_count,
-        'requests_blocked': stats['requests_blocked'],
+        'requests_total': total_requests,
+        'requests_allowed': allowed_requests,
+        'requests_blocked': blocked_requests,
         'requests_by_cdn': stats['requests_by_cdn'],
         'cdn_failures': stats['cdn_failures'],
         'errors': stats['errors'],
-        'request_rate': round(request_rate, 2),
+        'request_rate': round(aurora_request_rate, 2),
+        'lb_request_rate': round(lb_request_rate, 2),
         'success_rate': round(success_rate, 1),
-        'uptime_seconds': int(total_seconds),
+        'uptime_seconds': int(uptime.total_seconds()),
         'uptime': str(uptime).split('.')[0],
         'last_request': stats['last_request_time'].isoformat() if stats['last_request_time'] else None,
         'cdn_health': cdn_health,
         'algorithm': 'round-robin',
         'round_robin_index': round_robin_state['current_index'],
+        'aurora_shield_connected': aurora_stats is not None,
         'timestamp': datetime.now().isoformat()
     })
 

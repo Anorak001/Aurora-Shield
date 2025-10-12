@@ -288,7 +288,8 @@
                 <span class="algorithm-badge">Round-Robin Algorithm</span>
                 <div style="margin-top: 10px;">
                     <strong>Next CDN Index:</strong> <span id="round-robin-index">0</span><br>
-                    <strong>Last Request:</strong> <span id="last-request">Never</span>
+                    <strong>Last Request:</strong> <span id="last-request">Never</span><br>
+                    <strong>Data Source:</strong> <span id="aurora-connection-status">🔍 Checking...</span>
                 </div>
             </div>
         </div>
@@ -383,6 +384,18 @@
             
             const lastRequest = data.last_request ? new Date(data.last_request).toLocaleTimeString() : 'Never';
             document.getElementById('last-request').textContent = lastRequest;
+            
+            // Update Aurora Shield connection status
+            const connectionStatus = document.getElementById('aurora-connection-status');
+            if (connectionStatus) {
+                if (data.aurora_shield_connected) {
+                    connectionStatus.textContent = '🛡️ Aurora Shield Connected';
+                    connectionStatus.style.color = 'var(--accent-green)';
+                } else {
+                    connectionStatus.textContent = '⚠️ Aurora Shield Disconnected (Using Local Data)';
+                    connectionStatus.style.color = 'var(--accent-yellow)';
+                }
+            }
         }
 
         function updateCDNHealth(cdnHealth) {
