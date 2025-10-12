@@ -451,17 +451,19 @@ class WebDashboard:
                     logger.warning(f"Could not connect to attack orchestrator: {e}")
                     # Fall back to shield manager data if available
                     for request_info in self.shield_manager.recent_requests[-20:]:
-                        if request_info.get('status') in ['blocked', 'rate-limited']:
+                        # Include all action types from shield manager
+                        status = request_info.get('status')
+                        if status in ['blocked', 'sinkholed', 'blackholed', 'quarantined', 'rate-limited', 'challenged']:
                             recent_attacks.append({
                                 'ip': request_info.get('ip', 'Unknown'),
                                 'timestamp': request_info.get('timestamp_iso', datetime.now().isoformat()),
-                                'attack_type': self._map_status_to_attack_type(request_info.get('status')),
-                                'action_taken': self._map_status_to_action(request_info.get('status')),
-                                'severity': self._get_attack_severity_from_status(request_info.get('status')),
+                                'attack_type': self._map_status_to_attack_type(status),
+                                'action_taken': self._map_status_to_action(status),
+                                'severity': self._get_attack_severity_from_status(status),
                                 'total_requests': 1,
-                                'blocked_requests': 1 if request_info.get('status') == 'blocked' else 0,
+                                'blocked_requests': 1 if status in ['blocked', 'blackholed'] else 0,
                                 'bot_id': 'shield-manager',
-                                'status': request_info.get('status', 'unknown')
+                                'status': status
                             })
                 
                 # Apply filters
@@ -485,6 +487,9 @@ class WebDashboard:
                     },
                     'by_action': {
                         'blocked': len([a for a in recent_attacks if 'blocked' in a['action_taken'].lower()]),
+                        'sinkholed': len([a for a in recent_attacks if 'sinkholed' in a['action_taken'].lower()]),
+                        'blackholed': len([a for a in recent_attacks if 'blackholed' in a['action_taken'].lower()]),
+                        'quarantined': len([a for a in recent_attacks if 'quarantined' in a['action_taken'].lower()]),
                         'rate-limited': len([a for a in recent_attacks if 'rate' in a['action_taken'].lower()]),
                         'challenged': len([a for a in recent_attacks if 'challenge' in a['action_taken'].lower()]),
                         'monitored': len([a for a in recent_attacks if 'monitor' in a['action_taken'].lower()])
@@ -1094,9 +1099,11 @@ class WebDashboard:
         """Map request status to attack type"""
         status_mapping = {
             'blocked': 'Malicious Request',
-            'rate-limited': 'Rate Limit Exceeded',
+            'blackholed': 'Critical Threat',
             'sinkholed': 'Suspicious Activity',
-            'quarantined': 'Potential Threat'
+            'quarantined': 'Potential Threat',
+            'rate-limited': 'Rate Limit Exceeded',
+            'challenged': 'Challenge Required'
         }
         return status_mapping.get(status, 'Unknown Attack')
     
@@ -1104,9 +1111,11 @@ class WebDashboard:
         """Map request status to action taken"""
         action_mapping = {
             'blocked': 'Blocked',
-            'rate-limited': 'Rate Limited',
+            'blackholed': 'Blackholed',
             'sinkholed': 'Sinkholed',
-            'quarantined': 'Quarantined'
+            'quarantined': 'Quarantined',
+            'rate-limited': 'Rate Limited',
+            'challenged': 'Challenged'
         }
         return action_mapping.get(status, 'Monitored')
     
@@ -1114,40 +1123,23 @@ class WebDashboard:
         """Get attack severity based on status"""
         severity_mapping = {
             'blocked': 'high',
-            'rate-limited': 'medium',
+            'blackholed': 'critical',
             'sinkholed': 'high',
-            'quarantined': 'critical'
+            'quarantined': 'critical',
+            'rate-limited': 'medium',
+            'challenged': 'low'
         }
         return severity_mapping.get(status, 'low')
-        ip_attack_counts = {}
-        
-        for attack in recent_attacks:
-            # Count by type
-            attack_type = attack.get('attack_type', 'Unknown')
-            attacks_by_type[attack_type] = attacks_by_type.get(attack_type, 0) + 1
-            
-            # Count by action
-            action = attack.get('action_taken', 'Unknown')
-            attacks_by_action[action] = attacks_by_action.get(action, 0) + 1
-            
-            # Count by severity
-            severity = attack.get('severity', 'Low')
-            attacks_by_severity[severity] = attacks_by_severity.get(severity, 0) + 1
-            
-            # Count by IP
-            ip = attack.get('ip', 'Unknown')
-            ip_attack_counts[ip] = ip_attack_counts.get(ip, 0) + 1
-        
-        # Get top attacking IPs
-        top_attacking_ips = sorted(ip_attack_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        return {
-            'total_attacks': len(recent_attacks),
-            'attacks_by_type': attacks_by_type,
-            'attacks_by_action': attacks_by_action,
-            'attacks_by_severity': attacks_by_severity,
-            'top_attacking_ips': [{'ip': ip, 'count': count} for ip, count in top_attacking_ips]
-        }
+
+    def start(self):
+        """Start the dashboard server"""
+        logger.info("Starting Aurora Shield Dashboard...")
+        self.app.run(
+            host='0.0.0.0',
+            port=5001,
+            debug=False,
+            threaded=True
+        )
 
     def run(self, host='0.0.0.0', port=8080, debug=False):
         """Run the enhanced dashboard server."""

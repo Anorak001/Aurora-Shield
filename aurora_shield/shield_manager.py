@@ -105,9 +105,10 @@ class AuroraShieldManager:
                 'layer': 'bypass'
             }
         
-        # Layer 0: Sinkhole/Blackhole Check (highest priority)
+        # Layer 0: Sinkhole/Blackhole Check (only for already flagged IPs)
         sinkhole_check = sinkhole_manager.check_request(ip_address, fingerprint, user_agent)
         
+        # Only process if already in blackhole/sinkhole/quarantine lists
         if sinkhole_check['action'] == 'blackhole':
             self.blocked_requests += 1
             self.blackholed_requests += 1
@@ -166,35 +167,59 @@ class AuroraShieldManager:
                 'action': 'quarantine',
                 'quarantine_response': sinkhole_check['response']
             }
-        
-        # Layer 1: IP Reputation Check
+
+        # Layer 1: IP Reputation Check - Smart Response Based on Score
         reputation = self.ip_reputation.get_reputation(ip_address)
         if not reputation['allowed']:
             self.blocked_requests += 1
             
-            # Let the sinkhole system decide when to escalate based on its own violation tracking
-            # Don't auto-sinkhole just because reputation reached 0 - let other layers process traffic
-            # The sinkhole system will auto-escalate based on violation patterns and severity
+            # Smart response based on reputation score and attack pattern
+            score = reputation['score']
+            violation_type = self._classify_attack_type(request_data, reputation)
             
-            # Record violation for potential sinkhole escalation (sinkhole system decides when to escalate)
-            sinkhole_manager.process_violation(ip_address, 'ip_reputation', severity=reputation.get('severity', 5))
+            # Record violation with appropriate severity
+            severity = self._calculate_violation_severity(violation_type, score)
+            self.ip_reputation.record_violation(ip_address, violation_type, severity=severity)
             
-            # Implement queue fairness to prevent legitimate request starvation
-            sinkhole_manager.implement_queue_fairness()
+            # Decide response based on attack type and score
+            response = self._determine_response_strategy(ip_address, violation_type, score, severity)
             
-            self.elk_integration.log_event('request_blocked', {
-                'ip': ip_address,
-                'reason': 'ip_reputation',
-                'score': reputation['score']
-            })
-            self._log_request_realtime(request_data, 'blocked', f'IP reputation too low (score: {reputation["score"]})')
-            return {
-                'allowed': False,
-                'reason': f'IP reputation too low (score: {reputation["score"]})',
-                'layer': 'ip_reputation'
-            }
+            if response['action'] == 'blackhole':
+                sinkhole_manager.add_to_blackhole(ip_address, 'ip', response['reason'])
+                self.blackholed_requests += 1
+                self._log_request_realtime(request_data, 'blackholed', response['reason'])
+                return {
+                    'allowed': False,
+                    'reason': response['reason'],
+                    'layer': 'blackhole_escalation',
+                    'action': 'drop'
+                }
+            elif response['action'] == 'sinkhole':
+                sinkhole_manager.add_to_sinkhole(ip_address, 'ip', response['reason'])
+                self.sinkholed_requests += 1
+                self._log_request_realtime(request_data, 'sinkholed', response['reason'])
+                return {
+                    'allowed': False,
+                    'reason': response['reason'],
+                    'layer': 'sinkhole_escalation',
+                    'action': 'sinkhole'
+                }
+            else:
+                # Standard IP reputation block
+                self.elk_integration.log_event('request_blocked', {
+                    'ip': ip_address,
+                    'reason': 'ip_reputation',
+                    'score': score,
+                    'violation_type': violation_type
+                })
+                self._log_request_realtime(request_data, 'blocked', f'IP reputation: {violation_type} (score: {score})')
+                return {
+                    'allowed': False,
+                    'reason': f'IP reputation: {violation_type} (score: {score})',
+                    'layer': 'ip_reputation'
+                }
         
-        # Layer 2: Advanced Multi-Key Rate Limiting
+        # Layer 2: Advanced Multi-Key Rate Limiting with Smart Response
         advanced_check = advanced_limiter.check_request({
             'ip': ip_address,
             'user_agent': request_data.get('user_agent', ''),
@@ -216,28 +241,25 @@ class AuroraShieldManager:
                 'context': block_context
             })
             
-            # Increase reputation violation based on block type and record for sinkhole
-            severity_map = {
-                'global_rate_limit': 3,
-                'ip_rate_limit': 5,
-                'subnet_rate_limit': 8,
-                'fingerprint_rate_limit': 10,
-                'suspicious_behavior': 15,
-                'fair_queue_delay': 2
-            }
-            severity = severity_map.get(block_reason, 5)
-            self.ip_reputation.record_violation(ip_address, f'advanced_{block_reason}', severity=severity)
+            # Smart response for rate limiting violations
+            violation_type = self._classify_rate_limit_violation(block_reason, request_data)
+            severity = self._calculate_rate_limit_severity(block_reason, block_context)
             
-            # Record violation for sinkhole escalation
-            sinkhole_manager.process_violation(ip_address, f'advanced_{block_reason}', severity=severity)
+            self.ip_reputation.record_violation(ip_address, violation_type, severity=severity)
+            
+            # Determine if this should escalate to sinkhole/blackhole
+            if severity >= 25:  # High severity rate limiting violations
+                sinkhole_manager.process_violation(ip_address, violation_type, severity=severity)
             
             self._log_request_realtime(request_data, 'rate-limited', f'Advanced limiting: {block_reason}')
             
             return {
                 'allowed': False,
-                'reason': f'Advanced rate limiting: {block_reason}',
+                'reason': f'Rate limited: {violation_type} ({block_reason})',
                 'layer': 'advanced_rate_limiter',
-                'context': block_context
+                'context': block_context,
+                'violation_type': violation_type,
+                'severity': severity
             }
         
         # Layer 3: Basic Rate Limiting (backup/legacy)
@@ -257,22 +279,44 @@ class AuroraShieldManager:
                 'layer': 'basic_rate_limiter'
             }
         
-        # Layer 4: Anomaly Detection (Rule-Based)
+        # Layer 4: Anomaly Detection (Rule-Based) with Smart Response
         anomaly_check = self.anomaly_detector.check_request(ip_address)
         if not anomaly_check['allowed']:
             self.blocked_requests += 1
+            
+            # Classify anomaly type for better response
+            anomaly_type = self._classify_anomaly_type(request_data, anomaly_check)
+            severity = self._calculate_anomaly_severity(anomaly_type, anomaly_check)
+            
             self.elk_integration.log_attack({
                 'ip': ip_address,
-                'type': 'anomaly_detected',
-                'count': anomaly_check.get('count', 0)
+                'type': anomaly_type,
+                'count': anomaly_check.get('count', 0),
+                'severity': severity
             })
-            self.prometheus_integration.record_attack('anomaly')
-            self.ip_reputation.record_violation(ip_address, 'anomaly', severity=20)
-            self._log_request_realtime(request_data, 'blocked', 'Anomaly detected')
+            self.prometheus_integration.record_attack(anomaly_type)
+            self.ip_reputation.record_violation(ip_address, anomaly_type, severity=severity)
+            
+            # Determine response strategy for anomalies
+            if severity >= 30:  # High severity anomalies
+                response = self._determine_response_strategy(ip_address, anomaly_type, 0, severity)
+                if response['action'] == 'sinkhole':
+                    sinkhole_manager.add_to_sinkhole(ip_address, 'ip', response['reason'])
+                    self._log_request_realtime(request_data, 'sinkholed', response['reason'])
+                elif response['action'] == 'blackhole':
+                    sinkhole_manager.add_to_blackhole(ip_address, 'ip', response['reason'])
+                    self._log_request_realtime(request_data, 'blackholed', response['reason'])
+                else:
+                    self._log_request_realtime(request_data, 'blocked', f'Anomaly: {anomaly_type}')
+            else:
+                self._log_request_realtime(request_data, 'blocked', f'Anomaly: {anomaly_type}')
+            
             return {
                 'allowed': False,
-                'reason': 'Anomaly detected',
-                'layer': 'anomaly_detector'
+                'reason': f'Anomaly detected: {anomaly_type}',
+                'layer': 'anomaly_detector',
+                'anomaly_type': anomaly_type,
+                'severity': severity
             }
         
         # All checks passed
@@ -560,6 +604,254 @@ class AuroraShieldManager:
         self.blocked_requests = 0
         self.start_time = time.time()
         logger.info("Reset complete")
+    
+    def _classify_attack_type(self, request_data, reputation):
+        """
+        Classify the type of attack based on request characteristics and reputation data.
+        
+        Args:
+            request_data (dict): Request information
+            reputation (dict): IP reputation data
+            
+        Returns:
+            str: Attack type classification
+        """
+        user_agent = request_data.get('user_agent', '').lower()
+        path = request_data.get('path', request_data.get('uri', '/'))
+        method = request_data.get('method', 'GET')
+        
+        # Analyze attack patterns
+        if any(bot in user_agent for bot in ['bot', 'crawler', 'scanner', 'nikto', 'nessus']):
+            return 'automated_scanner'
+        elif 'curl' in user_agent or 'wget' in user_agent:
+            return 'command_line_tool'
+        elif any(sql in path.lower() for sql in ['union', 'select', 'drop', 'insert', 'update']):
+            return 'sql_injection'
+        elif any(xss in path.lower() for xss in ['<script', 'javascript:', 'onload=']):
+            return 'xss_attempt'
+        elif any(lfi in path.lower() for lfi in ['../../../', 'etc/passwd', 'windows/system32']):
+            return 'directory_traversal'
+        elif method == 'POST' and reputation['score'] < 20:
+            return 'brute_force'
+        elif reputation['score'] == 0:
+            return 'zero_reputation'
+        elif reputation['score'] < 30:
+            return 'low_reputation'
+        else:
+            return 'generic_malicious'
+    
+    def _calculate_violation_severity(self, violation_type, reputation_score):
+        """
+        Calculate violation severity based on attack type and reputation score.
+        
+        Args:
+            violation_type (str): Type of attack/violation
+            reputation_score (int): Current reputation score
+            
+        Returns:
+            int: Severity score (1-50)
+        """
+        # Base severity by attack type
+        severity_map = {
+            'sql_injection': 30,
+            'xss_attempt': 25,
+            'directory_traversal': 25,
+            'brute_force': 20,
+            'automated_scanner': 15,
+            'command_line_tool': 10,
+            'zero_reputation': 25,
+            'low_reputation': 10,
+            'generic_malicious': 5
+        }
+        
+        base_severity = severity_map.get(violation_type, 5)
+        
+        # Adjust severity based on reputation score (lower score = higher severity)
+        if reputation_score == 0:
+            base_severity += 10
+        elif reputation_score < 20:
+            base_severity += 5
+        
+        return min(50, base_severity)
+    
+    def _determine_response_strategy(self, ip_address, violation_type, reputation_score, severity):
+        """
+        Determine the appropriate response strategy based on attack characteristics.
+        
+        Args:
+            ip_address (str): Attacker IP
+            violation_type (str): Type of attack
+            reputation_score (int): Current reputation score
+            severity (int): Violation severity
+            
+        Returns:
+            dict: Response strategy with action and reason
+        """
+        # High-value intelligence targets (sinkhole for analysis)
+        intelligence_worthy = [
+            'sql_injection', 'xss_attempt', 'directory_traversal', 
+            'automated_scanner', 'zero_reputation'
+        ]
+        
+        # Volume/noise attacks (block immediately)
+        volume_attacks = [
+            'brute_force', 'command_line_tool'
+        ]
+        
+        # Extremely dangerous (blackhole immediately)
+        if severity >= 40 or reputation_score == 0 and violation_type in ['sql_injection', 'directory_traversal']:
+            return {
+                'action': 'blackhole',
+                'reason': f'Critical threat: {violation_type} (severity: {severity})'
+            }
+        
+        # Intelligence gathering (sinkhole for analysis)
+        elif violation_type in intelligence_worthy and severity >= 20:
+            return {
+                'action': 'sinkhole',
+                'reason': f'Intelligence gathering: {violation_type} (severity: {severity})'
+            }
+        
+        # Volume attacks (standard block)
+        elif violation_type in volume_attacks or severity < 15:
+            return {
+                'action': 'block',
+                'reason': f'Volume attack blocked: {violation_type} (severity: {severity})'
+            }
+        
+        # Default to standard block
+        else:
+            return {
+                'action': 'block',
+                'reason': f'Malicious activity blocked: {violation_type} (severity: {severity})'
+            }
+    
+    def _classify_rate_limit_violation(self, block_reason, request_data):
+        """
+        Classify rate limiting violations for better categorization.
+        
+        Args:
+            block_reason (str): Reason from advanced rate limiter
+            request_data (dict): Request information
+            
+        Returns:
+            str: Classified violation type
+        """
+        user_agent = request_data.get('user_agent', '').lower()
+        
+        # Map rate limit reasons to attack types
+        if block_reason == 'suspicious_behavior':
+            if 'bot' in user_agent or 'crawler' in user_agent:
+                return 'automated_flooding'
+            else:
+                return 'behavioral_anomaly'
+        elif block_reason == 'fingerprint_rate_limit':
+            return 'fingerprint_flooding'
+        elif block_reason == 'subnet_rate_limit':
+            return 'distributed_attack'
+        elif block_reason == 'ip_rate_limit':
+            return 'ip_flooding'
+        elif block_reason == 'global_rate_limit':
+            return 'volume_attack'
+        else:
+            return f'rate_limit_{block_reason}'
+    
+    def _calculate_rate_limit_severity(self, block_reason, block_context):
+        """
+        Calculate severity for rate limiting violations.
+        
+        Args:
+            block_reason (str): Reason from rate limiter
+            block_context (dict): Additional context from rate limiter
+            
+        Returns:
+            int: Severity score
+        """
+        # Base severity by block type
+        severity_map = {
+            'suspicious_behavior': 20,
+            'fingerprint_rate_limit': 15,
+            'subnet_rate_limit': 12,
+            'ip_rate_limit': 8,
+            'global_rate_limit': 5,
+            'fair_queue_delay': 3
+        }
+        
+        base_severity = severity_map.get(block_reason, 5)
+        
+        # Adjust based on context if available
+        if block_context and isinstance(block_context, dict):
+            if block_context.get('rate_exceeded_by', 0) > 10:  # Heavily exceeded
+                base_severity += 5
+            if block_context.get('repeated_violations', 0) > 3:  # Repeat offender
+                base_severity += 7
+        
+        return min(50, base_severity)
+    
+    def _classify_anomaly_type(self, request_data, anomaly_check):
+        """
+        Classify the type of anomaly detected.
+        
+        Args:
+            request_data (dict): Request information
+            anomaly_check (dict): Anomaly detection result
+            
+        Returns:
+            str: Anomaly type classification
+        """
+        user_agent = request_data.get('user_agent', '').lower()
+        path = request_data.get('path', request_data.get('uri', '/'))
+        method = request_data.get('method', 'GET')
+        count = anomaly_check.get('count', 0)
+        
+        # Classify based on patterns
+        if count > 100:
+            return 'high_frequency_anomaly'
+        elif any(scanner in user_agent for scanner in ['nikto', 'nessus', 'sqlmap', 'burp']):
+            return 'security_scanner'
+        elif method in ['PUT', 'DELETE', 'PATCH']:
+            return 'unusual_method_anomaly'
+        elif len(path) > 200:
+            return 'suspicious_path_anomaly'
+        elif count > 50:
+            return 'medium_frequency_anomaly'
+        else:
+            return 'behavioral_anomaly'
+    
+    def _calculate_anomaly_severity(self, anomaly_type, anomaly_check):
+        """
+        Calculate severity for anomaly violations.
+        
+        Args:
+            anomaly_type (str): Type of anomaly
+            anomaly_check (dict): Anomaly detection result
+            
+        Returns:
+            int: Severity score
+        """
+        count = anomaly_check.get('count', 0)
+        
+        # Base severity by anomaly type
+        severity_map = {
+            'security_scanner': 35,
+            'high_frequency_anomaly': 30,
+            'suspicious_path_anomaly': 25,
+            'unusual_method_anomaly': 20,
+            'medium_frequency_anomaly': 15,
+            'behavioral_anomaly': 10
+        }
+        
+        base_severity = severity_map.get(anomaly_type, 10)
+        
+        # Adjust based on frequency
+        if count > 200:
+            base_severity += 15
+        elif count > 100:
+            base_severity += 10
+        elif count > 50:
+            base_severity += 5
+        
+        return min(50, base_severity)
     
     def _is_legitimate_user(self, user_agent, path, ip_address):
         """

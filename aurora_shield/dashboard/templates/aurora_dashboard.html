@@ -583,6 +583,24 @@
             border: 1px solid rgba(155,124,255,0.3);
         }
 
+        .action-sinkholed {
+            background: rgba(255,165,2,0.2);
+            color: #FFB84D;
+            border: 1px solid rgba(255,165,2,0.3);
+        }
+
+        .action-blackholed {
+            background: rgba(255,71,87,0.2);
+            color: #FF6B7D;
+            border: 1px solid rgba(255,71,87,0.3);
+        }
+
+        .action-quarantined {
+            background: rgba(126,224,246,0.2);
+            color: #7EE0F6;
+            border: 1px solid rgba(126,224,246,0.3);
+        }
+
         .action-rate-limited {
             background: rgba(255,147,79,0.2);
             color: #FF934F;
@@ -962,27 +980,6 @@
             backdrop-filter: blur(6px) saturate(120%);
         }
 
-        .sinkhole-status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .sinkhole-stat-card {
-            background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .sinkhole-stat-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 4px 20px rgba(155, 124, 255, 0.15);
-        }
-
         .sinkhole-form-section {
             background: rgba(255,255,255,0.02);
             border: 1px solid rgba(255,255,255,0.05);
@@ -1050,74 +1047,6 @@
 
         .action-btn.danger:hover {
             box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
-        }
-
-        .sinkhole-list-section,
-        .blackhole-list-section {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-
-        .sinkhole-list-section h3,
-        .blackhole-list-section h3 {
-            color: var(--accent-2);
-            margin-bottom: 16px;
-            font-size: 18px;
-        }
-
-        .sinkhole-list,
-        .blackhole-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .sinkhole-entry,
-        .blackhole-entry {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .entry-info {
-            flex: 1;
-        }
-
-        .entry-target {
-            color: var(--accent);
-            font-weight: 500;
-        }
-
-        .entry-reason {
-            color: var(--muted);
-            font-size: 12px;
-            margin-top: 4px;
-        }
-
-        .entry-time {
-            color: var(--muted);
-            font-size: 11px;
-        }
-
-        .remove-btn {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11px;
-        }
-
-        .remove-btn:hover {
-            background: #e63946;
         }
 
         .no-data {
@@ -1255,7 +1184,10 @@
                             <select class="filter-select" id="action-filter" onchange="onActionFilterChange(this)">
                                 <option value="all">All Actions</option>
                                 <option value="blocked">Blocked</option>
+                                <option value="sinkholed">Sinkholed</option>
+                                <option value="blackholed">Blackholed</option>
                                 <option value="rate-limited">Rate Limited</option>
+                                <option value="quarantined">Quarantined</option>
                                 <option value="challenged">Challenged</option>
                                 <option value="monitored">Monitored</option>
                             </select>
@@ -1361,26 +1293,6 @@
         <div id="sinkhole-tab" class="tab-content">
             <div class="sinkhole-panel">
                 <div class="panel-title">🕳️ Sinkhole/Blackhole Management</div>
-                
-                <!-- Sinkhole Status -->
-                <div class="sinkhole-status-grid">
-                    <div class="sinkhole-stat-card">
-                        <div class="stat-value" id="sinkholed-ips">0</div>
-                        <div class="stat-label">Sinkholed IPs</div>
-                    </div>
-                    <div class="sinkhole-stat-card">
-                        <div class="stat-value" id="blackholed-ips">0</div>
-                        <div class="stat-label">Blackholed IPs</div>
-                    </div>
-                    <div class="sinkhole-stat-card">
-                        <div class="stat-value" id="blocked-requests">0</div>
-                        <div class="stat-label">Blocked Requests</div>
-                    </div>
-                    <div class="sinkhole-stat-card">
-                        <div class="stat-value" id="sinkhole-efficiency">99.9%</div>
-                        <div class="stat-label">Efficiency</div>
-                    </div>
-                </div>
 
                 <!-- Add to Sinkhole Form -->
                 <div class="sinkhole-form-section">
@@ -1403,24 +1315,6 @@
                     </div>
                     <button onclick="addToSinkhole()" class="action-btn">Add to Sinkhole</button>
                     <button onclick="addToBlackhole()" class="action-btn danger">Add to Blackhole</button>
-                </div>
-
-                <!-- Sinkhole List -->
-                <div class="sinkhole-list-section">
-                    <h3>Active Sinkhole Entries</h3>
-                    <div id="sinkhole-list" class="sinkhole-list">
-                        <!-- Dynamic content will be loaded here -->
-                        <div class="no-data">No sinkhole entries yet</div>
-                    </div>
-                </div>
-
-                <!-- Blackhole List -->
-                <div class="blackhole-list-section">
-                    <h3>Active Blackhole Entries</h3>
-                    <div id="blackhole-list" class="blackhole-list">
-                        <!-- Dynamic content will be loaded here -->
-                        <div class="no-data">No blackhole entries yet</div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1496,8 +1390,6 @@
                 </div>
                 
                 <div style="margin-top: 30px;">
-                    <button class="btn btn-primary" onclick="window.open('http://localhost:3000', '_blank')">📊 Open Grafana</button>
-                    <button class="btn btn-primary" onclick="window.open('http://localhost:5601', '_blank')">📋 Open Kibana</button>
                     <button class="btn btn-secondary" onclick="exportLogs()">💾 Export Logs</button>
                 </div>
             </div>
@@ -2495,63 +2387,8 @@
         }
 
         function loadSinkholeData() {
-            fetch('/api/sinkhole/status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateSinkholeStats(data.data);
-                        updateSinkholeList(data.data.sinkhole_entries || []);
-                        updateBlackholeList(data.data.blackhole_entries || []);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading sinkhole data:', error);
-                });
-        }
-
-        function updateSinkholeStats(data) {
-            document.getElementById('sinkholed-ips').textContent = data.sinkhole_count || 0;
-            document.getElementById('blackholed-ips').textContent = data.blackhole_count || 0;
-            document.getElementById('blocked-requests').textContent = data.blocked_requests || 0;
-            document.getElementById('sinkhole-efficiency').textContent = (data.efficiency || 99.9) + '%';
-        }
-
-        function updateSinkholeList(entries) {
-            const container = document.getElementById('sinkhole-list');
-            if (entries.length === 0) {
-                container.innerHTML = '<div class="no-data">No sinkhole entries yet</div>';
-                return;
-            }
-
-            container.innerHTML = entries.map(entry => `
-                <div class="sinkhole-entry">
-                    <div class="entry-info">
-                        <div class="entry-target">${entry.target}</div>
-                        <div class="entry-reason">${entry.reason}</div>
-                        <div class="entry-time">${new Date(entry.timestamp * 1000).toLocaleString()}</div>
-                    </div>
-                    <button class="remove-btn" onclick="removeFromSinkhole('${entry.target}')">Remove</button>
-                </div>
-            `).join('');
-        }
-
-        function updateBlackholeList(entries) {
-            const container = document.getElementById('blackhole-list');
-            if (entries.length === 0) {
-                container.innerHTML = '<div class="no-data">No blackhole entries yet</div>';
-                return;
-            }
-
-            container.innerHTML = entries.map(entry => `
-                <div class="blackhole-entry">
-                    <div class="entry-info">
-                        <div class="entry-target">${entry.target}</div>
-                        <div class="entry-reason">${entry.reason}</div>
-                        <div class="entry-time">${new Date(entry.timestamp * 1000).toLocaleString()}</div>
-                    </div>
-                    <button class="remove-btn" onclick="removeFromBlackhole('${entry.target}')">Remove</button>
-                </div>
-            `).join('');
+            // Sinkhole data loading removed - UI elements no longer present
+            console.log('Sinkhole data loading skipped - UI simplified');
         }
 
         function removeFromSinkhole(target) {
