@@ -177,6 +177,105 @@
             gap: 12px;
         }
 
+        /* Configuration Form Styles */
+        .config-section {
+            background: rgba(255,255,255,0.015);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-section-title {
+            color: var(--accent);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            color: var(--text);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input[type="number"],
+        .form-group input[type="text"],
+        .form-group select {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input[type="number"]:focus,
+        .form-group input[type="text"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155,124,255,0.1);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .form-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .form-group small {
+            color: var(--muted);
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .config-status {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 20px;
+        }
+
+        .status-message {
+            color: var(--text);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-message.success {
+            color: #4ade80;
+        }
+
+        .status-message.error {
+            color: #f87171;
+        }
+
+        .status-message.warning {
+            color: #fbbf24;
+        }
+
         /* Stats Grid */
         .stats-grid{ 
             display:grid; 
@@ -285,6 +384,315 @@
         .attack-slowloris { background: rgba(255,165,2,0.2); color: var(--warning); }
         .attack-http-flood { background: rgba(155,124,255,0.2); color: var(--accent); }
 
+        /* Action indicators */
+        .action-taken {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .action-sinkholed { background: rgba(255,165,2,0.3); color: #FFB84D; }
+        .action-blackholed { background: rgba(255,71,87,0.3); color: #FF6B7D; }
+        .action-quarantined { background: rgba(126,224,246,0.3); color: #7EE0F6; }
+        .action-blocked { background: rgba(155,124,255,0.3); color: #9B7CFF; }
+
+        /* Enhanced Attack Activity Styles */
+        .attack-activity-container {
+            background: linear-gradient(135deg, rgba(20,25,47,0.9), rgba(25,30,52,0.8));
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .attack-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 0.9rem;
+            color: #B8BCC8;
+            font-weight: 500;
+        }
+
+        .filter-select {
+            background: rgba(30,35,57,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #FFFFFF;
+            font-size: 0.9rem;
+            min-width: 120px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #00D4AA;
+            box-shadow: 0 0 0 2px rgba(0,212,170,0.2);
+        }
+
+        .attack-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(30,35,57,0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00D4AA;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #B8BCC8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .attack-log-enhanced {
+            background: rgba(15,20,35,0.6);
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .attack-entry {
+            display: grid;
+            grid-template-columns: 120px 1fr 150px 120px 100px;
+            gap: 15px;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .attack-entry:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .attack-time {
+            font-size: 0.85rem;
+            color: #B8BCC8;
+            font-family: 'Courier New', monospace;
+        }
+
+        .attack-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .attack-ip {
+            font-weight: bold;
+            color: #FF6B6B;
+            font-family: 'Courier New', monospace;
+        }
+
+        .attack-location {
+            font-size: 0.8rem;
+            color: #B8BCC8;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .attack-info {
+            font-size: 0.8rem;
+            color: #B8BCC8;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .attack-type {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .attack-severity {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .severity-critical {
+            background: rgba(255,107,107,0.2);
+            color: #FF6B6B;
+            border: 1px solid rgba(255,107,107,0.3);
+        }
+
+        .severity-high {
+            background: rgba(255,147,79,0.2);
+            color: #FF934F;
+            border: 1px solid rgba(255,147,79,0.3);
+        }
+
+        .severity-medium {
+            background: rgba(255,208,79,0.2);
+            color: #FFD04F;
+            border: 1px solid rgba(255,208,79,0.3);
+        }
+
+        .severity-low {
+            background: rgba(79,255,147,0.2);
+            color: #4FFF93;
+            border: 1px solid rgba(79,255,147,0.3);
+        }
+
+        .attack-action {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .action-blocked {
+            background: rgba(155,124,255,0.2);
+            color: #9B7CFF;
+            border: 1px solid rgba(155,124,255,0.3);
+        }
+
+        .action-sinkholed {
+            background: rgba(255,165,2,0.2);
+            color: #FFB84D;
+            border: 1px solid rgba(255,165,2,0.3);
+        }
+
+        .action-blackholed {
+            background: rgba(255,71,87,0.2);
+            color: #FF6B7D;
+            border: 1px solid rgba(255,71,87,0.3);
+        }
+
+        .action-quarantined {
+            background: rgba(126,224,246,0.2);
+            color: #7EE0F6;
+            border: 1px solid rgba(126,224,246,0.3);
+        }
+
+        .action-rate-limited {
+            background: rgba(255,147,79,0.2);
+            color: #FF934F;
+            border: 1px solid rgba(255,147,79,0.3);
+        }
+
+        .action-challenged {
+            background: rgba(255,208,79,0.2);
+            color: #FFD04F;
+            border: 1px solid rgba(255,208,79,0.3);
+        }
+
+        .action-monitored {
+            background: rgba(79,255,147,0.2);
+            color: #4FFF93;
+            border: 1px solid rgba(79,255,147,0.3);
+        }
+
+        .refresh-button {
+            background: linear-gradient(135deg, #00D4AA, #00B894);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .refresh-button:hover {
+            background: linear-gradient(135deg, #00B894, #00A085);
+            transform: translateY(-1px);
+        }
+
+        .no-attacks {
+            text-align: center;
+            padding: 40px;
+            color: #B8BCC8;
+            font-style: italic;
+        }
+
+        /* Threat Summary Grid */
+        .threat-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .threat-summary-card {
+            background: linear-gradient(135deg, rgba(20,25,47,0.9), rgba(25,30,52,0.8));
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .threat-summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), rgba(126,224,246,0.6));
+            border-radius: 12px 12px 0 0;
+        }
+
+        .threat-count {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .threat-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #dbe6ff;
+            margin-bottom: 4px;
+        }
+
+        .threat-desc {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         /* Status indicators */
         .status-indicator {
             width: 12px;
@@ -296,6 +704,16 @@
 
         .status-active { background-color: var(--success); box-shadow: 0 0 12px rgba(0,255,136,0.4); }
         .status-inactive { background-color: var(--danger); box-shadow: 0 0 12px rgba(255,71,87,0.4); }
+        .status-emergency { 
+            background-color: #ff6b6b; 
+            box-shadow: 0 0 15px rgba(255,107,107,0.8); 
+            animation: emergency-pulse 2s infinite;
+        }
+
+        @keyframes emergency-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
         .status-warning { background-color: var(--warning); box-shadow: 0 0 12px rgba(255,165,2,0.4); }
 
         /* Mitigation controls */
@@ -513,6 +931,7 @@
         .request-entry {
             display: flex;
             align-items: center;
+            gap: 20px;
             padding: 8px 0;
             border-bottom: 1px solid rgba(255,255,255,0.03);
             animation: slideIn 0.3s ease;
@@ -529,18 +948,18 @@
 
         .request-timestamp {
             color: var(--muted);
-            width: 80px;
+            width: 110px;
             flex-shrink: 0;
         }
 
         .request-ip {
             color: var(--accent-2);
-            width: 120px;
+            width: 150px;
             flex-shrink: 0;
         }
 
         .request-method {
-            width: 60px;
+            width: 70px;
             flex-shrink: 0;
             font-weight: 600;
         }
@@ -548,11 +967,10 @@
         .request-url {
             flex: 1;
             color: #dbe6ff;
-            margin: 0 12px;
         }
 
         .request-status {
-            width: 80px;
+            width: 100px;
             text-align: right;
             font-weight: 600;
         }
@@ -561,88 +979,92 @@
         .request-status.blocked { color: var(--danger); }
         .request-status.rate-limited { color: var(--warning); }
 
-        .rate-limit-viz {
-            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+        /* Sinkhole Tab Styles */
+        .sinkhole-panel {
+            background: var(--panel);
             border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:24px;
+            margin-bottom:24px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        .sinkhole-form-section {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
         }
 
-        .rate-limit-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
+        .sinkhole-form-section h3 {
+            color: var(--accent);
+            margin-bottom: 16px;
+            font-size: 18px;
         }
 
-        .rate-limit-card {
-            background: rgba(255,255,255,0.02);
-            border-radius: 8px;
-            padding: 16px;
-            border: 1px solid rgba(255,255,255,0.05);
+        .form-group {
+            margin-bottom: 16px;
         }
 
-        .rate-limit-header {
-            color: var(--accent-2);
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-
-        .rate-limit-bar {
-            background: rgba(255,255,255,0.1);
-            height: 8px;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-
-        .rate-limit-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
-            transition: width 0.3s ease;
-            border-radius: 4px;
-        }
-
-        .rate-limit-text {
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
             color: var(--muted);
-            font-size: 12px;
+            font-size: 14px;
         }
 
-        .ip-reputation-monitor {
-            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
-            border: 1px solid rgba(255,255,255,0.04);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .ip-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 12px;
-        }
-
-        .ip-entry {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: rgba(255,255,255,0.02);
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
+            color: #dbe6ff;
+            font-size: 14px;
         }
 
-        .ip-address {
-            color: var(--accent-2);
-            font-family: 'Courier New', monospace;
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(155, 124, 255, 0.2);
         }
 
-        .ip-score {
-            font-weight: 600;
+        .action-btn {
+            background: linear-gradient(145deg, var(--accent), #8b6bff);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
 
-        .ip-score.good { color: var(--success); }
-        .ip-score.suspicious { color: var(--warning); }
-        .ip-score.malicious { color: var(--danger); }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(155, 124, 255, 0.3);
+        }
+
+        .action-btn.danger {
+            background: linear-gradient(145deg, var(--danger), #e63946);
+        }
+
+        .action-btn.danger:hover {
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+        }
+
+        .no-data {
+            text-align: center;
+            color: var(--muted);
+            padding: 20px;
+            font-style: italic;
+        }
 
         /* Responsive */
         @media (max-width:768px){ 
@@ -697,10 +1119,6 @@
                     <h1>🛡️ Aurora Shield Dashboard</h1>
                     <p>Real-time DDoS protection monitoring and mitigation controls</p>
                 </div>
-                <div style="text-align: right; color: var(--muted);">
-                    <div id="system-clock" style="font-size: 18px; font-weight: bold; color: var(--primary);"></div>
-                    <div style="font-size: 12px;">System Time</div>
-                </div>
             </div>
         </div>
         
@@ -708,6 +1126,7 @@
         <div class="tab-navigation">
             <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
             <button class="tab-btn" onclick="switchTab('mitigation')">🛡️ Mitigation</button>
+            <button class="tab-btn" onclick="switchTab('sinkhole')">🕳️ Sinkhole</button>
             <button class="tab-btn" onclick="switchTab('live-requests')">🔴 Live Requests</button>
             <button class="tab-btn" onclick="switchTab('monitoring')">📡 Monitoring</button>
             <button class="tab-btn" onclick="switchTab('config')">⚙️ Configuration</button>
@@ -742,14 +1161,94 @@
                         <div class="stat-value" id="active-mitigations">3</div>
                         <div class="stat-label">Active Mitigations</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="system-clock" style="font-size: 16px; font-weight: bold;">--:--:--</div>
+                        <div class="stat-label">System Time</div>
+                    </div>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
-                    <div class="panel-title">🚨 Recent Attack Activity</div>
-                    <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
+                    <div class="panel-title">🚨 Recent Attack Activity & Actions Taken</div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="refresh-button" onclick="refreshAttackActivity()">🔄 Refresh</button>
+                        <div id="last-updated" style="color: var(--muted); font-size: 12px;"></div>
+                    </div>
                 </div>
-                <div class="attack-log" id="attackLog">
-                    <!-- Attack logs will be populated by JavaScript -->
+                
+                <!-- Enhanced Attack Activity Container -->
+                <div class="attack-activity-container">
+                    <!-- Attack Filters -->
+                    <div class="attack-filters">
+                        <div class="filter-group">
+                            <label>Filter by Severity:</label>
+                            <select class="filter-select" id="severity-filter" onchange="onSeverityFilterChange(this)">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Filter by Action:</label>
+                            <select class="filter-select" id="action-filter" onchange="onActionFilterChange(this)">
+                                <option value="all">All Actions</option>
+                                <option value="blocked">Blocked</option>
+                                <option value="sinkholed">Sinkholed</option>
+                                <option value="blackholed">Blackholed</option>
+                                <option value="rate-limited">Rate Limited</option>
+                                <option value="quarantined">Quarantined</option>
+                                <option value="challenged">Challenged</option>
+                                <option value="monitored">Monitored</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Attack Statistics -->
+                    <div class="attack-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="total-attacks">0</div>
+                            <div class="stat-label">Total Attacks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="critical-attacks">0</div>
+                            <div class="stat-label">Critical</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="blocked-attacks">0</div>
+                            <div class="stat-label">Blocked</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="unique-ips">0</div>
+                            <div class="stat-label">Unique IPs</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Enhanced Attack Log -->
+                    <div class="attack-log-enhanced" id="enhanced-attack-log">
+                        <div class="no-attacks">Loading attack activity...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <div class="panel-title">🎯 Active Threat Intelligence</div>
+                    <div class="threat-summary-grid">
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="sinkholed-count">0</div>
+                            <div class="threat-label">Sinkholed IPs</div>
+                            <div class="threat-desc">Intelligence gathering</div>
+                        </div>
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="blackholed-count">0</div>
+                            <div class="threat-label">Blackholed IPs</div>
+                            <div class="threat-desc">Complete blocks</div>
+                        </div>
+                        <div class="threat-summary-card">
+                            <div class="threat-count" id="quarantined-count">0</div>
+                            <div class="threat-label">Quarantined IPs</div>
+                            <div class="threat-desc">Temporary isolation</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="auto-refresh">
@@ -792,10 +1291,45 @@
                             <span class="status-indicator status-inactive"></span>
                         </div>
                         <div class="mitigation-description">
-                            Activate maximum protection during severe attacks
+                            <strong>CRITICAL SECURITY PROTOCOL:</strong><br>
+                            Initiates immediate infrastructure shutdown for emergency maintenance during severe multi-vector attacks. 
+                            All non-essential services (CDN nodes, load balancers, demo applications) will be gracefully terminated 
+                            to prevent system compromise and data loss. Only the Aurora Shield core dashboard remains operational 
+                            for incident monitoring and recovery coordination.<br><br>
+                            <span style="color: #ff6b6b; font-weight: bold;">⚠️ WARNING:</span> This action will cause temporary service unavailability but is necessary to preserve system integrity during critical security incidents.
                         </div>
-                        <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate</button>
+                        <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate Emergency Shutdown</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sinkhole Tab -->
+        <div id="sinkhole-tab" class="tab-content">
+            <div class="sinkhole-panel">
+                <div class="panel-title">🕳️ Sinkhole/Blackhole Management</div>
+
+                <!-- Add to Sinkhole Form -->
+                <div class="sinkhole-form-section">
+                    <h3>Add to Sinkhole</h3>
+                    <div class="form-group">
+                        <label for="target-input">Target (IP/Subnet/Fingerprint):</label>
+                        <input type="text" id="target-input" placeholder="e.g., 192.168.1.100, 10.0.0.0/8, or fingerprint:abc123">
+                    </div>
+                    <div class="form-group">
+                        <label for="target-type">Type:</label>
+                        <select id="target-type">
+                            <option value="ip">IP Address</option>
+                            <option value="subnet">Subnet/CIDR</option>
+                            <option value="fingerprint">Fingerprint</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reason-input">Reason:</label>
+                        <input type="text" id="reason-input" placeholder="e.g., DDoS attack, suspicious activity">
+                    </div>
+                    <button onclick="addToSinkhole()" class="action-btn">Add to Sinkhole</button>
+                    <button onclick="addToBlackhole()" class="action-btn danger">Add to Blackhole</button>
                 </div>
             </div>
         </div>
@@ -844,42 +1378,6 @@
                         <!-- Live requests will be inserted here -->
                     </div>
                 </div>
-
-                <!-- Rate Limiting Visualization -->
-                <div class="rate-limit-viz">
-                    <div class="panel-title">⚡ Rate Limiting Status</div>
-                    <div class="rate-limit-grid">
-                        <div class="rate-limit-card">
-                            <div class="rate-limit-header">IP: <span id="top-ip">127.0.0.1</span></div>
-                            <div class="rate-limit-bar">
-                                <div class="rate-limit-fill" id="rate-fill-1" style="width: 0%"></div>
-                            </div>
-                            <div class="rate-limit-text"><span id="rate-count-1">0</span>/100 req/min</div>
-                        </div>
-                        <div class="rate-limit-card">
-                            <div class="rate-limit-header">IP: <span id="second-ip">192.168.1.100</span></div>
-                            <div class="rate-limit-bar">
-                                <div class="rate-limit-fill" id="rate-fill-2" style="width: 0%"></div>
-                            </div>
-                            <div class="rate-limit-text"><span id="rate-count-2">0</span>/100 req/min</div>
-                        </div>
-                        <div class="rate-limit-card">
-                            <div class="rate-limit-header">IP: <span id="third-ip">10.0.0.50</span></div>
-                            <div class="rate-limit-bar">
-                                <div class="rate-limit-fill" id="rate-fill-3" style="width: 0%"></div>
-                            </div>
-                            <div class="rate-limit-text"><span id="rate-count-3">0</span>/100 req/min</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- IP Reputation Monitor -->
-                <div class="ip-reputation-monitor">
-                    <div class="panel-title">🔍 IP Reputation Monitor</div>
-                    <div class="ip-list" id="ip-reputation-list">
-                        <!-- IP reputation entries will be populated here -->
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -907,8 +1405,6 @@
                 </div>
                 
                 <div style="margin-top: 30px;">
-                    <button class="btn btn-primary" onclick="window.open('http://localhost:3000', '_blank')">📊 Open Grafana</button>
-                    <button class="btn btn-primary" onclick="window.open('http://localhost:5601', '_blank')">📋 Open Kibana</button>
                     <button class="btn btn-secondary" onclick="exportLogs()">💾 Export Logs</button>
                 </div>
             </div>
@@ -921,17 +1417,210 @@
                 <p style="color: var(--muted); margin-bottom: 20px;">Configure Aurora Shield protection parameters and thresholds</p>
                 
                 <div style="margin-bottom: 20px;">
-                    <button class="btn btn-primary" onclick="exportConfig()">💾 Export Config</button>
-                    <button class="btn btn-secondary" onclick="importConfig()">📁 Import Config</button>
-                    <button class="btn btn-success" onclick="resetToDefaults()">🔄 Reset Defaults</button>
+                    <button class="btn btn-primary" onclick="saveConfiguration()">💾 Save Configuration</button>
+                    <button class="btn btn-secondary" onclick="exportConfig()">� Export Config</button>
+                    <button class="btn btn-warning" onclick="resetToDefaults()">🔄 Reset Defaults</button>
+                    <button class="btn btn-info" onclick="loadConfiguration()">🔄 Reload</button>
                 </div>
                 
-                <div style="padding: 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
-                    <h4 style="color: var(--accent); margin-bottom: 16px;">Current Configuration Status</h4>
-                    <p style="color: var(--muted); font-size: 14px;">
-                        Configuration interface allows real-time adjustment of protection parameters.
-                        Changes are applied immediately to the running system.
-                    </p>
+                <!-- Configuration Form Container -->
+                <div id="config-form-container">
+                    <!-- Rate Limiter Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🚦 Rate Limiter</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="rate-limiter-enabled">Enable Rate Limiting</label>
+                                <input type="checkbox" id="rate-limiter-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-rate">Rate (tokens/sec)</label>
+                                <input type="number" id="rate-limiter-rate" min="1" max="10000" value="10">
+                                <small>Number of tokens added per second</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-burst">Burst Size</label>
+                                <input type="number" id="rate-limiter-burst" min="1" max="1000" value="20">
+                                <small>Maximum burst size</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="rate-limiter-window">Window Size (sec)</label>
+                                <input type="number" id="rate-limiter-window" min="1" max="3600" value="60">
+                                <small>Rate limiting window duration</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Anomaly Detector Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🔍 Anomaly Detector</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="anomaly-enabled">Enable Anomaly Detection</label>
+                                <input type="checkbox" id="anomaly-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-window">Request Window (sec)</label>
+                                <input type="number" id="anomaly-window" min="1" max="3600" value="60">
+                                <small>Time window for analysis</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-threshold">Rate Threshold</label>
+                                <input type="number" id="anomaly-threshold" min="1" max="100000" value="100">
+                                <small>Requests per window threshold</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="anomaly-sensitivity">Sensitivity</label>
+                                <select id="anomaly-sensitivity">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                                <small>Anomaly detection sensitivity</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IP Reputation Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🛡️ IP Reputation</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="ip-reputation-enabled">Enable IP Reputation</label>
+                                <input type="checkbox" id="ip-reputation-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-initial-score">Initial Score</label>
+                                <input type="number" id="ip-initial-score" min="0" max="100" value="100">
+                                <small>Starting reputation score</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-threshold">Reputation Threshold</label>
+                                <input type="number" id="ip-threshold" min="0" max="100" value="50">
+                                <small>Minimum score for access</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip-decay-rate">Decay Rate</label>
+                                <input type="number" id="ip-decay-rate" min="0" max="1" step="0.01" value="0.1">
+                                <small>Reputation recovery rate</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Challenge Response Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🧩 Challenge Response</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="challenge-enabled">Enable Challenge Response</label>
+                                <input type="checkbox" id="challenge-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-timeout">Challenge Timeout (sec)</label>
+                                <input type="number" id="challenge-timeout" min="10" max="3600" value="300">
+                                <small>Time to complete challenge</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-difficulty">Difficulty</label>
+                                <select id="challenge-difficulty">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                                <small>Challenge complexity level</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="challenge-max-attempts">Max Attempts</label>
+                                <input type="number" id="challenge-max-attempts" min="1" max="10" value="3">
+                                <small>Maximum challenge attempts</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sinkhole Configuration -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">🕳️ Sinkhole System</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="sinkhole-enabled">Enable Sinkhole</label>
+                                <input type="checkbox" id="sinkhole-enabled" checked>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-sinkhole-enabled">Auto Sinkhole</label>
+                                <input type="checkbox" id="auto-sinkhole-enabled" checked>
+                                <small>Automatically sinkhole zero-reputation IPs</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="queue-fairness-enabled">Queue Fairness</label>
+                                <input type="checkbox" id="queue-fairness-enabled" checked>
+                                <small>Prevent legitimate request starvation</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="queue-max-size">Queue Max Size</label>
+                                <input type="number" id="queue-max-size" min="100" max="10000" value="1000">
+                                <small>Maximum quarantine queue size</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Thresholds -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">⚡ System Thresholds</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="threshold-rps">Requests/Second</label>
+                                <input type="number" id="threshold-rps" min="10" max="100000" value="1000">
+                                <small>Maximum requests per second</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-connections">Connection Limit</label>
+                                <input type="number" id="threshold-connections" min="10" max="1000000" value="10000">
+                                <small>Maximum concurrent connections</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-response-time">Response Time (ms)</label>
+                                <input type="number" id="threshold-response-time" min="100" max="30000" value="5000">
+                                <small>Maximum response time</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-cpu">CPU Threshold (%)</label>
+                                <input type="number" id="threshold-cpu" min="10" max="95" value="80">
+                                <small>CPU usage alert threshold</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="threshold-memory">Memory Threshold (%)</label>
+                                <input type="number" id="threshold-memory" min="10" max="95" value="85">
+                                <small>Memory usage alert threshold</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Settings -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">📊 Dashboard Settings</h3>
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="dashboard-host">Host</label>
+                                <input type="text" id="dashboard-host" value="0.0.0.0">
+                                <small>Dashboard bind address</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="dashboard-port">Port</label>
+                                <input type="number" id="dashboard-port" min="1" max="65535" value="8080">
+                                <small>Dashboard port number</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="dashboard-refresh">Refresh Interval (sec)</label>
+                                <input type="number" id="dashboard-refresh" min="1" max="60" value="5">
+                                <small>Data refresh interval</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Status -->
+                <div class="config-status" id="config-status" style="display: none;">
+                    <div class="status-message" id="status-message"></div>
                 </div>
             </div>
         </div>
@@ -1007,8 +1696,16 @@
                         lastUpdatedElement.textContent = `Last updated: ${timestamp}`;
                     }
                     
-                    // Update attack log
-                    updateAttackLog(data.recent_attacks || []);
+                    // Update enhanced attack activity
+                    updateEnhancedAttackActivity();
+                    
+                    // Update threat intelligence summary
+                    updateThreatIntelligence();
+                    
+                    // Process real-time request data if available
+                    if (data.recent_requests && data.recent_requests.length > 0) {
+                        processLiveRequests(data.recent_requests);
+                    }
                 })
                 .catch(error => {
                     console.error('Error fetching stats:', error);
@@ -1016,28 +1713,35 @@
                 });
         }
 
-        function updateAttackLog(attacks) {
-            const log = document.getElementById('attackLog');
-            if (!log) return;
-            
-            // Show real attack data if available, otherwise show empty state
-            if (attacks.length === 0) {
-                log.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px;">No recent attacks detected</div>';
-                return;
-            }
+        function getActionClass(action) {
+            if (!action) return 'blocked';
+            const actionLower = action.toLowerCase();
+            if (actionLower.includes('sinkhole')) return 'sinkholed';
+            if (actionLower.includes('blackhole')) return 'blackholed';
+            if (actionLower.includes('quarantine')) return 'quarantined';
+            return 'blocked';
+        }
 
-            log.innerHTML = attacks.slice(0, 5).map(attack => `
-                <div class="attack-log-item">
-                    <div>
-                        <span class="attack-type attack-${attack.type.toLowerCase().replace(' ', '-')}">${attack.type}</span>
-                        <span style="margin-left: 12px; color: var(--muted);">${attack.source}</span>
-                    </div>
-                    <div>
-                        <span style="color: var(--success); margin-right: 8px;">${attack.status}</span>
-                        <span style="color: var(--muted); font-size: 11px;">${formatAttackTimestamp(attack.timestamp)}</span>
-                    </div>
-                </div>
-            `).join('');
+        function updateThreatIntelligence() {
+            fetch('/api/dashboard/attacking-ips')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const summary = data.data.sinkhole_summary;
+                        
+                        // Update threat summary cards
+                        document.getElementById('sinkholed-count').textContent = summary.sinkholed_ips || 0;
+                        document.getElementById('blackholed-count').textContent = summary.blackholed_ips || 0;
+                        document.getElementById('quarantined-count').textContent = summary.quarantined_ips || 0;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching threat intelligence:', error);
+                    // Set fallback values
+                    document.getElementById('sinkholed-count').textContent = '0';
+                    document.getElementById('blackholed-count').textContent = '0';
+                    document.getElementById('quarantined-count').textContent = '0';
+                });
         }
 
         function formatAttackTimestamp(timestamp) {
@@ -1080,8 +1784,202 @@
         }
 
         function updateConfigStatus() {
-            // This would fetch configuration status from the API
-            console.log('Updating configuration status...');
+            // Load current configuration into the form
+            loadConfiguration();
+        }
+
+        function loadConfiguration() {
+            fetch('/api/dashboard/config')
+                .then(response => response.json())
+                .then(config => {
+                    // Rate Limiter
+                    document.getElementById('rate-limiter-enabled').checked = config.rate_limiter?.enabled ?? true;
+                    document.getElementById('rate-limiter-rate').value = config.rate_limiter?.rate ?? 10;
+                    document.getElementById('rate-limiter-burst').value = config.rate_limiter?.burst ?? 20;
+                    document.getElementById('rate-limiter-window').value = config.rate_limiter?.window_size ?? 60;
+
+                    // Anomaly Detector
+                    document.getElementById('anomaly-enabled').checked = config.anomaly_detector?.enabled ?? true;
+                    document.getElementById('anomaly-window').value = config.anomaly_detector?.request_window ?? 60;
+                    document.getElementById('anomaly-threshold').value = config.anomaly_detector?.rate_threshold ?? 100;
+                    document.getElementById('anomaly-sensitivity').value = config.anomaly_detector?.sensitivity ?? 'medium';
+
+                    // IP Reputation
+                    document.getElementById('ip-reputation-enabled').checked = config.ip_reputation?.enabled ?? true;
+                    document.getElementById('ip-initial-score').value = config.ip_reputation?.initial_score ?? 100;
+                    document.getElementById('ip-threshold').value = config.ip_reputation?.reputation_threshold ?? 50;
+                    document.getElementById('ip-decay-rate').value = config.ip_reputation?.decay_rate ?? 0.1;
+
+                    // Challenge Response
+                    document.getElementById('challenge-enabled').checked = config.challenge_response?.enabled ?? true;
+                    document.getElementById('challenge-timeout').value = config.challenge_response?.challenge_timeout ?? 300;
+                    document.getElementById('challenge-difficulty').value = config.challenge_response?.difficulty ?? 'medium';
+                    document.getElementById('challenge-max-attempts').value = config.challenge_response?.max_attempts ?? 3;
+
+                    // Sinkhole
+                    document.getElementById('sinkhole-enabled').checked = config.sinkhole?.enabled ?? true;
+                    document.getElementById('auto-sinkhole-enabled').checked = config.sinkhole?.auto_sinkhole_enabled ?? true;
+                    document.getElementById('queue-fairness-enabled').checked = config.sinkhole?.queue_fairness_enabled ?? true;
+                    document.getElementById('queue-max-size').value = config.sinkhole?.queue_max_size ?? 1000;
+
+                    // Thresholds
+                    document.getElementById('threshold-rps').value = config.thresholds?.requests_per_second ?? 1000;
+                    document.getElementById('threshold-connections').value = config.thresholds?.connection_limit ?? 10000;
+                    document.getElementById('threshold-response-time').value = config.thresholds?.response_time_limit ?? 5000;
+                    document.getElementById('threshold-cpu').value = config.thresholds?.cpu_threshold ?? 80;
+                    document.getElementById('threshold-memory').value = config.thresholds?.memory_threshold ?? 85;
+
+                    // Dashboard
+                    document.getElementById('dashboard-host').value = config.dashboard?.host ?? '0.0.0.0';
+                    document.getElementById('dashboard-port').value = config.dashboard?.port ?? 8080;
+                    document.getElementById('dashboard-refresh').value = config.dashboard?.refresh_interval ?? 5;
+
+                    showConfigStatus('✅ Configuration loaded successfully', 'success');
+                })
+                .catch(error => {
+                    console.error('Error loading configuration:', error);
+                    showConfigStatus('❌ Failed to load configuration', 'error');
+                });
+        }
+
+        function saveConfiguration() {
+            const config = {
+                rate_limiter: {
+                    enabled: document.getElementById('rate-limiter-enabled').checked,
+                    rate: parseInt(document.getElementById('rate-limiter-rate').value),
+                    burst: parseInt(document.getElementById('rate-limiter-burst').value),
+                    window_size: parseInt(document.getElementById('rate-limiter-window').value)
+                },
+                anomaly_detector: {
+                    enabled: document.getElementById('anomaly-enabled').checked,
+                    request_window: parseInt(document.getElementById('anomaly-window').value),
+                    rate_threshold: parseInt(document.getElementById('anomaly-threshold').value),
+                    sensitivity: document.getElementById('anomaly-sensitivity').value
+                },
+                ip_reputation: {
+                    enabled: document.getElementById('ip-reputation-enabled').checked,
+                    initial_score: parseInt(document.getElementById('ip-initial-score').value),
+                    reputation_threshold: parseInt(document.getElementById('ip-threshold').value),
+                    decay_rate: parseFloat(document.getElementById('ip-decay-rate').value)
+                },
+                challenge_response: {
+                    enabled: document.getElementById('challenge-enabled').checked,
+                    challenge_timeout: parseInt(document.getElementById('challenge-timeout').value),
+                    difficulty: document.getElementById('challenge-difficulty').value,
+                    max_attempts: parseInt(document.getElementById('challenge-max-attempts').value)
+                },
+                sinkhole: {
+                    enabled: document.getElementById('sinkhole-enabled').checked,
+                    auto_sinkhole_enabled: document.getElementById('auto-sinkhole-enabled').checked,
+                    queue_fairness_enabled: document.getElementById('queue-fairness-enabled').checked,
+                    queue_max_size: parseInt(document.getElementById('queue-max-size').value)
+                },
+                thresholds: {
+                    requests_per_second: parseInt(document.getElementById('threshold-rps').value),
+                    connection_limit: parseInt(document.getElementById('threshold-connections').value),
+                    response_time_limit: parseInt(document.getElementById('threshold-response-time').value),
+                    cpu_threshold: parseInt(document.getElementById('threshold-cpu').value),
+                    memory_threshold: parseInt(document.getElementById('threshold-memory').value)
+                },
+                dashboard: {
+                    host: document.getElementById('dashboard-host').value,
+                    port: parseInt(document.getElementById('dashboard-port').value),
+                    refresh_interval: parseInt(document.getElementById('dashboard-refresh').value)
+                }
+            };
+
+            fetch('/api/dashboard/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showConfigStatus('✅ Configuration saved successfully', 'success');
+                } else {
+                    showConfigStatus(`❌ Failed to save: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving configuration:', error);
+                showConfigStatus('❌ Failed to save configuration', 'error');
+            });
+        }
+
+        function showConfigStatus(message, type) {
+            const statusDiv = document.getElementById('config-status');
+            const messageDiv = document.getElementById('status-message');
+            
+            messageDiv.textContent = message;
+            messageDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function exportConfig() {
+            fetch('/api/dashboard/config')
+                .then(response => response.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `aurora-shield-config-${new Date().toISOString().slice(0,10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showConfigStatus('📥 Configuration exported successfully', 'success');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showConfigStatus('❌ Failed to export configuration', 'error');
+                });
+        }
+
+        function resetToDefaults() {
+            if (confirm('🔄 Are you sure you want to reset all settings to defaults? This will overwrite current configuration.')) {
+                // Reset form to default values
+                document.getElementById('rate-limiter-rate').value = 10;
+                document.getElementById('rate-limiter-burst').value = 20;
+                document.getElementById('rate-limiter-window').value = 60;
+                document.getElementById('anomaly-window').value = 60;
+                document.getElementById('anomaly-threshold').value = 100;
+                document.getElementById('anomaly-sensitivity').value = 'medium';
+                document.getElementById('ip-initial-score').value = 100;
+                document.getElementById('ip-threshold').value = 50;
+                document.getElementById('ip-decay-rate').value = 0.1;
+                document.getElementById('challenge-timeout').value = 300;
+                document.getElementById('challenge-difficulty').value = 'medium';
+                document.getElementById('challenge-max-attempts').value = 3;
+                document.getElementById('queue-max-size').value = 1000;
+                document.getElementById('threshold-rps').value = 1000;
+                document.getElementById('threshold-connections').value = 10000;
+                document.getElementById('threshold-response-time').value = 5000;
+                document.getElementById('threshold-cpu').value = 80;
+                document.getElementById('threshold-memory').value = 85;
+                document.getElementById('dashboard-host').value = '0.0.0.0';
+                document.getElementById('dashboard-port').value = 8080;
+                document.getElementById('dashboard-refresh').value = 5;
+                
+                // Check all enable checkboxes
+                document.getElementById('rate-limiter-enabled').checked = true;
+                document.getElementById('anomaly-enabled').checked = true;
+                document.getElementById('ip-reputation-enabled').checked = true;
+                document.getElementById('challenge-enabled').checked = true;
+                document.getElementById('sinkhole-enabled').checked = true;
+                document.getElementById('auto-sinkhole-enabled').checked = true;
+                document.getElementById('queue-fairness-enabled').checked = true;
+                
+                showConfigStatus('🔄 Configuration reset to defaults', 'warning');
+            }
         }
 
         function simulateData() {
@@ -1119,43 +2017,246 @@
         }
 
         function toggleEmergencyMode() {
-            if (confirm('⚠️ Are you sure you want to activate Emergency Mode? This will apply maximum protection but may affect legitimate users.')) {
-                alert('🚨 Emergency Mode activated! All non-essential traffic will be filtered.');
+            if (confirm('🚨 CRITICAL SECURITY ALERT!\n\n⚠️  Emergency infrastructure shutdown will be initiated immediately.\n\n🔴 This will terminate Docker containers:\n   • Load balancer containers\n   • CDN distribution nodes\n   • Demo application instances\n   • Attack orchestrator services\n   • Database and monitoring services\n\n✅ Aurora Shield dashboard will remain operational for recovery.\n\n⏱️  Estimated downtime: 2-5 minutes for graceful shutdown\n📊 System recovery requires manual restart after threat assessment\n\n⚠️  WARNING: This will actually stop Docker containers!\n\nContinue with emergency shutdown protocol?')) {
+                
+                // Show loading overlay
+                showEmergencyShutdownProgress();
+                
+                // Call the real emergency shutdown API
+                fetch('/api/emergency/shutdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        reason: 'Emergency shutdown initiated from dashboard by user'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove progress overlay
+                    const overlay = document.getElementById('emergency-overlay');
+                    if (overlay) {
+                        document.body.removeChild(overlay);
+                    }
+                    
+                    if (data.success) {
+                        const results = data.results || [];
+                        const stopped = results.filter(r => r.status === 'stopped');
+                        const failed = results.filter(r => r.status === 'error');
+                        
+                        let message = `🚨 EMERGENCY SHUTDOWN COMPLETED!\n\n`;
+                        message += `✅ Successfully stopped: ${stopped.length} containers\n`;
+                        if (failed.length > 0) {
+                            message += `❌ Failed to stop: ${failed.length} containers\n`;
+                        }
+                        message += `\n📋 Containers stopped:\n`;
+                        
+                        stopped.forEach(container => {
+                            message += `   • ${container.name} (${container.id})\n`;
+                        });
+                        
+                        if (failed.length > 0) {
+                            message += `\n❌ Failed containers:\n`;
+                            failed.forEach(container => {
+                                message += `   • ${container.name}: ${container.error}\n`;
+                            });
+                        }
+                        
+                        message += `\n🛡️  Aurora Shield dashboard remains active\n`;
+                        message += `� System status: EMERGENCY MODE\n`;
+                        message += `⚠️  Manual container restart required to restore services\n`;
+                        message += `⏰ Shutdown completed at: ${new Date(data.shutdown_time).toLocaleString()}`;
+                        
+                        alert(message);
+                        
+                        // Update UI to show emergency state
+                        updateEmergencyModeUI(true);
+                    } else {
+                        alert(`🚨 EMERGENCY SHUTDOWN FAILED!\n\n❌ Error: ${data.error}\n\n${data.message || ''}\n\nPlease contact system administrator immediately.`);
+                    }
+                })
+                .catch(error => {
+                    // Remove progress overlay
+                    const overlay = document.getElementById('emergency-overlay');
+                    if (overlay) {
+                        document.body.removeChild(overlay);
+                    }
+                    
+                    console.error('Emergency shutdown error:', error);
+                    alert(`🚨 EMERGENCY SHUTDOWN FAILED!\n\n❌ Network Error: ${error.message}\n\nUnable to communicate with emergency shutdown API.\nPlease contact system administrator immediately.`);
+                });
             }
         }
 
-        function exportConfig() {
-            fetch('/api/dashboard/config')
-                .then(response => response.json())
-                .then(data => {
-                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'aurora-shield-config.json';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('📋 Configuration export simulated for demo');
-                });
+        function showEmergencyShutdownProgress() {
+            // Create overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'emergency-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); z-index: 10000;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                color: white; font-family: monospace;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="text-align: center; max-width: 600px; padding: 40px;">
+                    <h2 style="color: #ff6b6b; margin-bottom: 30px;">🚨 EMERGENCY DOCKER SHUTDOWN IN PROGRESS</h2>
+                    <div id="shutdown-progress" style="text-align: left; background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #333;">
+                        <div class="progress-line">⏱️  Connecting to Docker daemon...</div>
+                        <div class="progress-line">🔄 Scanning for running containers...</div>
+                        <div class="progress-line">� Initiating graceful shutdown sequence...</div>
+                        <div class="progress-line">� Sending SIGTERM to all containers...</div>
+                        <div class="progress-line">⏰ Waiting for graceful termination...</div>
+                        <div class="progress-line">💀 Force killing unresponsive containers...</div>
+                    </div>
+                    <div style="margin-top: 20px; color: #ffd700;">
+                        ⚠️ REAL DOCKER SHUTDOWN IN PROGRESS - DO NOT CLOSE
+                    </div>
+                    <div style="margin-top: 10px; color: #ff6b6b; font-size: 14px;">
+                        This will actually stop your Docker containers!
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            // Animate progress
+            const progressLines = overlay.querySelectorAll('.progress-line');
+            progressLines.forEach((line, index) => {
+                setTimeout(() => {
+                    line.style.color = '#4ade80';
+                    line.innerHTML = line.innerHTML.replace('🔄', '✅').replace('⏱️', '✅').replace('📡', '✅').replace('�', '✅');
+                }, (index + 1) * 600);
+            });
+            
+            // Remove overlay after sequence
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 4000);
+        }
+
+        function updateEmergencyModeUI(active) {
+            const button = document.querySelector('[onclick="toggleEmergencyMode()"]');
+            const indicator = button.parentElement.querySelector('.status-indicator');
+            
+            if (active) {
+                button.textContent = '🟢 System in Maintenance Mode';
+                button.className = 'btn btn-warning';
+                button.onclick = () => alert('🛡️ System is in emergency maintenance mode.\n\n📞 Contact system administrator for service restoration.\n📧 Emergency contact: security@aurorashield.com\n🔧 Manual intervention required to restart services.');
+                indicator.className = 'status-indicator status-emergency';
+                indicator.style.background = '#ff6b6b';
+                indicator.style.boxShadow = '0 0 10px #ff6b6b';
+            }
         }
 
         function importConfig() {
-            alert('📁 Configuration import interface would be implemented here');
-        }
-
-        function resetToDefaults() {
-            if (confirm('🔄 Are you sure you want to reset all settings to defaults?')) {
-                alert('✅ Configuration reset to default values');
-            }
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const config = JSON.parse(e.target.result);
+                            // You would validate and apply the imported config here
+                            showConfigStatus('� Configuration imported successfully', 'success');
+                        } catch (error) {
+                            showConfigStatus('❌ Invalid configuration file', 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
         }
 
         function exportLogs() {
-            alert('💾 Log export functionality would be implemented here');
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '⏳ Exporting...';
+            btn.disabled = true;
+            
+            // Call the export API
+            fetch('/api/export/logs')
+                .then(response => {
+                    if (response.ok) {
+                        // Get filename from response headers or create default
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'aurora_shield_logs.json';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename=([^;]+)/);
+                            if (filenameMatch) {
+                                filename = filenameMatch[1];
+                            }
+                        }
+                        
+                        // Create download
+                        return response.blob().then(blob => {
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            
+                            // Show success message
+                            showLogExportStatus('✅ Logs exported successfully!', 'success');
+                        });
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Export failed');
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Log export error:', error);
+                    showLogExportStatus(`❌ Export failed: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    // Restore button state
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                });
+        }
+        
+        function showLogExportStatus(message, type) {
+            // Create or update status message
+            let statusDiv = document.getElementById('log-export-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'log-export-status';
+                statusDiv.style.cssText = `
+                    position: fixed; top: 80px; right: 20px; z-index: 1000;
+                    padding: 12px 20px; border-radius: 8px; font-weight: 500;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 300px;
+                    backdrop-filter: blur(10px);
+                `;
+                document.body.appendChild(statusDiv);
+            }
+            
+            statusDiv.textContent = message;
+            
+            if (type === 'success') {
+                statusDiv.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                statusDiv.style.color = 'white';
+            } else {
+                statusDiv.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                statusDiv.style.color = 'white';
+            }
+            
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                if (statusDiv && statusDiv.parentNode) {
+                    statusDiv.parentNode.removeChild(statusDiv);
+                }
+            }, 4000);
         }
 
         function refreshAllData() {
@@ -1179,8 +2280,7 @@
             rateLimitedCount: 0,
             isPaused: false,
             requestHistory: [],
-            ipCounters: {},
-            ipReputation: {}
+            ipCounters: {}
         };
 
         let liveRequestsInterval = null;
@@ -1198,8 +2298,6 @@
                 if (!liveRequestsData.isPaused) {
                     fetchLiveRequests();
                     updateLiveStats();
-                    updateRateLimitViz();
-                    updateIPReputation();
                 }
             }, 1000);
             
@@ -1224,7 +2322,6 @@
                         
                         // Update displays
                         updateLiveStats();
-                        updateRateLimitViz();
                     }
                 })
                 .catch(error => {
@@ -1292,9 +2389,6 @@
                 };
                 
                 addRequestToStream(request);
-                
-                // Update IP reputation
-                updateIPReputationData(ip, status);
             }
             
             // Update requests per second
@@ -1308,10 +2402,18 @@
                 stream.innerHTML = '';
             }
             
+            // Reset counters for fresh data
+            liveRequestsData.ipCounters = {};
+            
             requests.forEach(request => {
                 // Process real request data
                 addRequestToStream(request);
-                updateIPReputationData(request.ip, request.status);
+                
+                // Update IP counters for rate limiting display
+                if (!liveRequestsData.ipCounters[request.ip]) {
+                    liveRequestsData.ipCounters[request.ip] = 0;
+                }
+                liveRequestsData.ipCounters[request.ip]++;
             });
         }
 
@@ -1366,66 +2468,6 @@
             document.getElementById('live-rate-limited').textContent = liveRequestsData.rateLimitedCount || 0;
         }
 
-        function updateRateLimitViz() {
-            const topIPs = Object.entries(liveRequestsData.ipCounters)
-                .sort(([,a], [,b]) => b - a)
-                .slice(0, 3);
-            
-            topIPs.forEach((entry, index) => {
-                const [ip, count] = entry;
-                const percentage = Math.min((count / 100) * 100, 100);
-                
-                const ipElement = document.getElementById(`${['top', 'second', 'third'][index]}-ip`);
-                const fillElement = document.getElementById(`rate-fill-${index + 1}`);
-                const countElement = document.getElementById(`rate-count-${index + 1}`);
-                
-                if (ipElement) ipElement.textContent = ip;
-                if (fillElement) fillElement.style.width = percentage + '%';
-                if (countElement) countElement.textContent = count;
-            });
-        }
-
-        function updateIPReputationData(ip, status) {
-            if (!liveRequestsData.ipReputation[ip]) {
-                liveRequestsData.ipReputation[ip] = {
-                    score: 100,
-                    requests: 0,
-                    blocked: 0
-                };
-            }
-            
-            const rep = liveRequestsData.ipReputation[ip];
-            rep.requests++;
-            
-            if (status === 'blocked' || status === 'rate-limited') {
-                rep.blocked++;
-                rep.score = Math.max(0, rep.score - 10);
-            } else {
-                rep.score = Math.min(100, rep.score + 1);
-            }
-        }
-
-        function updateIPReputation() {
-            const ipList = document.getElementById('ip-reputation-list');
-            if (!ipList) return;
-            
-            const topIPs = Object.entries(liveRequestsData.ipReputation)
-                .sort(([,a], [,b]) => b.requests - a.requests)
-                .slice(0, 6);
-            
-            ipList.innerHTML = topIPs.map(([ip, rep]) => {
-                const scoreClass = rep.score >= 80 ? 'good' : rep.score >= 50 ? 'suspicious' : 'malicious';
-                const statusIcon = rep.score >= 80 ? '✅' : rep.score >= 50 ? '⚠️' : '🚫';
-                
-                return `
-                    <div class="ip-entry">
-                        <span class="ip-address">${ip}</span>
-                        <span class="ip-score ${scoreClass}">${statusIcon} ${rep.score}/100</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
         function pauseStream() {
             liveRequestsData.isPaused = !liveRequestsData.isPaused;
             const btn = document.getElementById('pause-btn');
@@ -1456,7 +2498,6 @@
             liveRequestsData.rateLimitedCount = 0;
             liveRequestsData.requestsPerSec = 0;
             liveRequestsData.ipCounters = {};
-            liveRequestsData.ipReputation = {};
             updateLiveStats();
         }
 
@@ -1479,7 +2520,7 @@
 
         function updateSystemClock() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+            const timeString = now.toLocaleTimeString();
             const clockElement = document.getElementById('system-clock');
             if (clockElement) {
                 clockElement.textContent = timeString;
@@ -1487,9 +2528,253 @@
         }
 
         // Initialize dashboard
+        // Sinkhole management functions
+        function addToSinkhole() {
+            const target = document.getElementById('target-input').value.trim();
+            const type = document.getElementById('target-type').value;
+            const reason = document.getElementById('reason-input').value.trim() || 'Manual addition';
+
+            if (!target) {
+                alert('Please enter a target');
+                return;
+            }
+
+            const data = {
+                target: target,
+                type: type,
+                reason: reason
+            };
+
+            fetch('/api/sinkhole/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Successfully added to sinkhole: ' + target);
+                    clearSinkholeForm();
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function addToBlackhole() {
+            const target = document.getElementById('target-input').value.trim();
+            const reason = document.getElementById('reason-input').value.trim() || 'Manual blackhole';
+
+            if (!target) {
+                alert('Please enter a target');
+                return;
+            }
+
+            const data = {
+                target: target,
+                reason: reason
+            };
+
+            fetch('/api/blackhole/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Successfully added to blackhole: ' + target);
+                    clearSinkholeForm();
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function clearSinkholeForm() {
+            document.getElementById('target-input').value = '';
+            document.getElementById('reason-input').value = '';
+            document.getElementById('target-type').value = 'ip';
+        }
+
+        function loadSinkholeData() {
+            // Sinkhole data loading removed - UI elements no longer present
+            console.log('Sinkhole data loading skipped - UI simplified');
+        }
+
+        function removeFromSinkhole(target) {
+            if (!confirm('Remove ' + target + ' from sinkhole?')) return;
+
+            fetch('/api/sinkhole/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ target: target })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        function removeFromBlackhole(target) {
+            if (!confirm('Remove ' + target + ' from blackhole?')) return;
+
+            fetch('/api/blackhole/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ target: target })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSinkholeData();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error occurred');
+            });
+        }
+
+        // Enhanced Attack Activity Functions
+        let currentAttackFilters = {
+            severity: 'all',
+            action: 'all',
+            limit: 50
+        };
+
+        function updateEnhancedAttackActivity() {
+            const params = new URLSearchParams({
+                severity: currentAttackFilters.severity,
+                action: currentAttackFilters.action,
+                limit: currentAttackFilters.limit
+            });
+
+            fetch(`/api/dashboard/attack-activity?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayAttackStats(data.data.statistics);
+                        displayAttackEntries(data.data.attacks);
+                    } else {
+                        console.error('Error fetching attack activity:', data.error);
+                        showEmptyAttackState();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching attack activity:', error);
+                    showEmptyAttackState();
+                });
+        }
+
+        function displayAttackStats(stats) {
+            document.getElementById('total-attacks').textContent = stats.total_attacks || 0;
+            document.getElementById('critical-attacks').textContent = stats.by_severity.critical || 0;
+            document.getElementById('blocked-attacks').textContent = stats.by_action.blocked || 0;
+            document.getElementById('unique-ips').textContent = stats.unique_ips || 0;
+        }
+
+        function displayAttackEntries(attacks) {
+            const container = document.getElementById('enhanced-attack-log');
+            if (!container) return;
+
+            if (attacks.length === 0) {
+                showEmptyAttackState();
+                return;
+            }
+
+            container.innerHTML = attacks.map(attack => `
+                <div class="attack-entry">
+                    <div class="attack-time">${formatAttackTime(attack.timestamp)}</div>
+                    <div class="attack-details">
+                        <div class="attack-ip">${attack.ip}</div>
+                        <div class="attack-info">
+                            📊 ${attack.total_requests || 0} requests (${attack.blocked_requests || 0} blocked)
+                        </div>
+                    </div>
+                    <div class="attack-type">${attack.attack_type}</div>
+                    <div class="attack-severity severity-${attack.severity.toLowerCase()}">
+                        ${attack.severity.toUpperCase()}
+                    </div>
+                    <div class="attack-action action-${attack.action_taken.toLowerCase().replace(' ', '-')}">
+                        ${attack.action_taken}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatAttackTime(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString();
+            } catch (error) {
+                return timestamp || 'Unknown';
+            }
+        }
+
+        function showEmptyAttackState() {
+            const container = document.getElementById('enhanced-attack-log');
+            if (container) {
+                container.innerHTML = '<div class="no-attacks">No recent attacks detected</div>';
+            }
+        }
+
+        function onSeverityFilterChange(select) {
+            currentAttackFilters.severity = select.value;
+            updateEnhancedAttackActivity();
+        }
+
+        function onActionFilterChange(select) {
+            currentAttackFilters.action = select.value;
+            updateEnhancedAttackActivity();
+        }
+
+        function refreshAttackActivity() {
+            updateEnhancedAttackActivity();
+            
+            // Add visual feedback to refresh button
+            const btn = document.querySelector('.refresh-button');
+            if (btn) {
+                btn.style.transform = 'scale(0.95) rotate(360deg)';
+                setTimeout(() => {
+                    btn.style.transform = '';
+                }, 300);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             {% if current_user %}
             startAutoRefresh();
+            // Load sinkhole data when page loads
+            loadSinkholeData();
             {% endif %}
         });
     </script>

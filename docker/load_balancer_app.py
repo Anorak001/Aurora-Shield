@@ -112,41 +112,17 @@ def health():
 @app.route('/cdn/')
 @app.route('/cdn')
 def load_balanced():
-    """Load balanced CDN access with Aurora Shield protection."""
+    """Load balanced CDN access - requests pre-filtered by Aurora Shield."""
     logger.info("=== CDN REQUEST RECEIVED ===")
     stats['requests_total'] += 1
     
-    # Check with Aurora Shield first
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    user_agent = request.headers.get('User-Agent', '')
-    logger.info(f"Processing CDN request from IP: {client_ip}")
+    aurora_shield_filtered = request.headers.get('X-Aurora-Shield') == 'filtered'
     
-    try:
-        # Send request to Aurora Shield for authorization
-        logger.info(f"Checking request with Aurora Shield for IP: {client_ip}")
-        shield_response = requests.post(
-            'http://aurora-shield:8080/api/shield/check-request',
-            headers={
-                'X-Original-IP': client_ip,
-                'X-Original-URI': '/cdn/',
-                'User-Agent': user_agent
-            },
-            timeout=2
-        )
-        
-        logger.info(f"Aurora Shield response: {shield_response.status_code}")
-        
-        # If Aurora Shield blocks the request
-        if shield_response.status_code == 403:
-            logger.warning(f"Request blocked by Aurora Shield from {client_ip}")
-            return jsonify({
-                'error': 'Request blocked by Aurora Shield',
-                'reason': 'Security policy violation'
-            }), 403
-            
-    except requests.RequestException as e:
-        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
-        # If Aurora Shield is unreachable, log but allow the request
+    logger.info(f"Processing CDN request from IP: {client_ip} (Aurora Shield filtered: {aurora_shield_filtered})")
+    
+    # Since requests come through Aurora Shield dashboard proxy, they are pre-filtered
+    # No need for additional authorization checks
     
     selected_cdn = get_next_cdn_roundrobin()
     if not selected_cdn:
@@ -154,6 +130,7 @@ def load_balanced():
         return jsonify({'error': 'No active CDN available'}), 503
     
     stats['requests_by_cdn'][selected_cdn] += 1
+    stats['requests_allowed'] += 1
     
     try:
         cdn_config = CDN_SERVICES[selected_cdn]
@@ -162,11 +139,13 @@ def load_balanced():
         # Add load balancer headers
         response_data = response.text
         if response.headers.get('content-type', '').startswith('text/html'):
+            filter_status = "Aurora Shield Filtered" if aurora_shield_filtered else "Direct"
             response_data = response_data.replace(
                 '<body>',
-                f'<body><div style="background:#3498db;color:white;padding:10px;text-align:center;">🔀 Served by {selected_cdn.title()} CDN via Load Balancer (Protected by Aurora Shield)</div>'
+                f'<body><div style="background:#27ae60;color:white;padding:10px;text-align:center;">�️ {filter_status} → {selected_cdn.upper()} CDN via Load Balancer | Client IP: {client_ip}</div>'
             )
         
+        logger.info(f"Successfully served request from {client_ip} via {selected_cdn} CDN")
         return response_data, response.status_code
         
     except requests.RequestException as e:
@@ -235,18 +214,81 @@ def direct_cdn(cdn_name):
         stats['errors'] += 1
         return jsonify({'error': f'CDN {cdn_name} unavailable'}), 503
 
+def get_aurora_shield_stats():
+    """Get comprehensive statistics from Aurora Shield dashboard"""
+    try:
+        # Try the public health endpoint first
+        response = requests.get('http://aurora-shield:8080/health', timeout=5)
+        if response.status_code != 200:
+            logger.warning("Aurora Shield not reachable")
+            return None
+            
+        # Try to get stats from dashboard - use session with login
+        session = requests.Session()
+        
+        # Login to dashboard
+        login_data = {'username': 'admin', 'password': 'admin123'}
+        login_response = session.post('http://aurora-shield:8080/login', data=login_data, timeout=5)
+        
+        if login_response.status_code == 200:
+            # Now fetch stats with authenticated session
+            stats_response = session.get('http://aurora-shield:8080/api/dashboard/stats', timeout=5)
+            if stats_response.status_code == 200:
+                data = stats_response.json()
+                return {
+                    'total_requests': data.get('total_requests', 0),
+                    'allowed_requests': data.get('allowed_requests', 0), 
+                    'blocked_requests': data.get('blocked_requests', 0),
+                    'rate_limited': data.get('rate_limited', 0),
+                    'sinkholed': data.get('sinkholed', 0),
+                    'request_rate': data.get('request_rate', 0),
+                    'uptime': data.get('uptime', '0h 0m'),
+                    'active_connections': data.get('active_connections', 0),
+                    'reputation_scores': data.get('reputation_scores', {}),
+                    'timestamp': data.get('timestamp')
+                }
+                
+    except Exception as e:
+        logger.warning(f"Could not fetch Aurora Shield stats: {e}")
+    return None
+
+def get_dashboard_allowed_count():
+    """Get allowed requests count from Aurora Shield dashboard stats"""
+    aurora_stats = get_aurora_shield_stats()
+    if aurora_stats:
+        return aurora_stats.get('allowed_requests', 0)
+    return 0
+
 @app.route('/stats')
 def get_stats():
-    """Get load balancer statistics."""
+    """Get load balancer statistics based on Aurora Shield traffic data."""
     uptime = datetime.now() - stats['start_time']
     
-    # Calculate rates
-    total_seconds = uptime.total_seconds()
-    request_rate = stats['requests_total'] / max(total_seconds, 1)
+    # Get comprehensive stats from Aurora Shield
+    aurora_stats = get_aurora_shield_stats()
     
-    # Calculate success rate
-    success_requests = stats['requests_allowed']
-    success_rate = (success_requests / max(stats['requests_total'], 1)) * 100
+    if aurora_stats:
+        # Use Aurora Shield's traffic data
+        total_requests = aurora_stats['total_requests']
+        allowed_requests = aurora_stats['allowed_requests']
+        blocked_requests = aurora_stats['blocked_requests']
+        aurora_request_rate = aurora_stats['request_rate']
+        
+        # Calculate success rate based on Aurora Shield data
+        success_rate = (allowed_requests / max(total_requests, 1)) * 100
+        
+        # Calculate load balancer specific metrics
+        total_seconds = uptime.total_seconds()
+        lb_request_rate = stats['requests_total'] / max(total_seconds, 1)
+        
+    else:
+        # Fallback to local stats if Aurora Shield is unavailable
+        total_requests = stats['requests_total']
+        allowed_requests = stats['requests_allowed']
+        blocked_requests = stats['requests_blocked']
+        aurora_request_rate = stats['requests_total'] / max(uptime.total_seconds(), 1)
+        success_rate = (allowed_requests / max(total_requests, 1)) * 100
+        lb_request_rate = aurora_request_rate
     
     # Get CDN health status
     cdn_health = {}
@@ -259,20 +301,22 @@ def get_stats():
         }
     
     return jsonify({
-        'requests_total': stats['requests_total'],
-        'requests_allowed': stats['requests_allowed'],
-        'requests_blocked': stats['requests_blocked'],
+        'requests_total': total_requests,
+        'requests_allowed': allowed_requests,
+        'requests_blocked': blocked_requests,
         'requests_by_cdn': stats['requests_by_cdn'],
         'cdn_failures': stats['cdn_failures'],
         'errors': stats['errors'],
-        'request_rate': round(request_rate, 2),
+        'request_rate': round(aurora_request_rate, 2),
+        'lb_request_rate': round(lb_request_rate, 2),
         'success_rate': round(success_rate, 1),
-        'uptime_seconds': int(total_seconds),
+        'uptime_seconds': int(uptime.total_seconds()),
         'uptime': str(uptime).split('.')[0],
         'last_request': stats['last_request_time'].isoformat() if stats['last_request_time'] else None,
         'cdn_health': cdn_health,
         'algorithm': 'round-robin',
         'round_robin_index': round_robin_state['current_index'],
+        'aurora_shield_connected': aurora_stats is not None,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -291,10 +335,8 @@ def legacy_dashboard():
                          stats=stats, 
                          uptime=str(uptime).split('.')[0])
 
-@app.route('/')
-def index():
-    """Redirect to enhanced dashboard with round-robin visualization."""
-    return redirect('/dashboard')
+# Removed specific root route handler to allow catch-all to handle all user-facing paths
+# This ensures all traffic goes through Aurora Shield protection
 
 @app.route('/api/cdn/health')
 def check_cdn_health():
@@ -1073,6 +1115,144 @@ def get_cdn_status():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+# Catch-all route for Aurora Shield protection
+@app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+def catch_all_protected(path):
+    """Catch-all route that protects all unhandled paths with Aurora Shield."""
+    logger.info(f"=== CATCH-ALL REQUEST RECEIVED for /{path} ===")
+    stats['requests_total'] += 1
+    
+    # Extract request information
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', '')
+    method = request.method
+    full_path = f"/{path}"
+    
+    logger.info(f"Processing {method} request for {full_path} from IP: {client_ip}")
+    
+    try:
+        # Send request to Aurora Shield for authorization
+        logger.info(f"Checking request with Aurora Shield for IP: {client_ip}, Path: {full_path}")
+        shield_response = requests.request(
+            method.upper(),
+            'http://aurora-shield:8080/api/shield/check-request',
+            headers={
+                'X-Original-IP': client_ip,
+                'X-Original-URI': full_path,
+                'X-Original-Method': method,
+                'User-Agent': user_agent
+            },
+            data=request.get_data(),
+            timeout=5
+        )
+        
+        logger.info(f"Aurora Shield response: {shield_response.status_code}")
+        
+        # If Aurora Shield blocks the request
+        if shield_response.status_code == 403:
+            logger.warning(f"Request blocked by Aurora Shield from {client_ip} for {full_path}")
+            stats['requests_blocked'] = stats.get('requests_blocked', 0) + 1
+            return jsonify({
+                'error': 'Request blocked by Aurora Shield',
+                'reason': 'Security policy violation',
+                'path': full_path,
+                'ip': client_ip
+            }), 403
+            
+    except requests.RequestException as e:
+        logger.warning(f"Could not reach Aurora Shield: {e}, allowing request")
+        # If Aurora Shield is unreachable, log but allow the request
+    
+    # If Aurora Shield allows the request, forward to a CDN
+    selected_cdn = get_next_cdn_roundrobin()
+    if not selected_cdn:
+        stats['errors'] += 1
+        return jsonify({'error': 'No active CDN available'}), 503
+    
+    stats['requests_by_cdn'][selected_cdn] += 1
+    
+    try:
+        cdn_config = CDN_SERVICES[selected_cdn]
+        target_url = f"{cdn_config['url']}/{path}"
+        
+        logger.info(f"Forwarding {method} request to {target_url}")
+        
+        # Forward the request to the selected CDN
+        response = requests.request(
+            method,
+            target_url,
+            headers={k: v for k, v in request.headers if k.lower() not in ['host', 'x-forwarded-for']},
+            data=request.get_data(),
+            params=request.args,
+            timeout=10,
+            allow_redirects=False
+        )
+        
+        # Handle the response
+        if response.headers.get('content-type', '').startswith('text/html'):
+            response_data = response.text.replace(
+                '<body>',
+                f'<body><div style="background:#27ae60;color:white;padding:10px;text-align:center;">🛡️ Protected by Aurora Shield via {selected_cdn.title()} CDN</div>'
+            )
+            return response_data, response.status_code
+        else:
+            return response.content, response.status_code, dict(response.headers)
+        
+    except requests.RequestException as e:
+        logger.error(f"Error forwarding request to {selected_cdn} CDN: {e}")
+        stats['errors'] += 1
+        # Mark CDN as inactive and return error
+        CDN_SERVICES[selected_cdn]['status'] = 'inactive'
+        return jsonify({
+            'error': f'Service temporarily unavailable',
+            'cdn': selected_cdn,
+            'path': full_path
+        }), 503
+
+@app.route('/api/reset-stats', methods=['POST'])
+def reset_stats():
+    """Reset all load balancer statistics to zero."""
+    global stats
+    logger.info("Resetting load balancer statistics")
+    
+    # Reset all stats to initial values
+    stats = {
+        'requests_total': 0,
+        'requests_by_cdn': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'requests_allowed': 0,
+        'requests_blocked': 0,
+        'errors': 0,
+        'cdn_failures': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'start_time': datetime.now(),
+        'last_request_time': None
+    }
+    
+    logger.info("Load balancer statistics reset successfully")
+    return jsonify({
+        'message': 'Statistics reset successfully',
+        'timestamp': datetime.now().isoformat(),
+        'stats': stats
+    })
+
+def initialize_stats():
+    """Initialize or reset statistics at startup."""
+    global stats
+    logger.info("Initializing load balancer statistics")
+    
+    stats = {
+        'requests_total': 0,
+        'requests_by_cdn': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'requests_allowed': 0,
+        'requests_blocked': 0,
+        'errors': 0,
+        'cdn_failures': {'primary': 0, 'secondary': 0, 'tertiary': 0},
+        'start_time': datetime.now(),
+        'last_request_time': None
+    }
+    logger.info("Load balancer statistics initialized successfully")
+
 if __name__ == '__main__':
+    # Initialize stats on startup
+    initialize_stats()
     logger.info("Starting Aurora Shield Load Balancer on port 8090")
     app.run(host='0.0.0.0', port=8090, debug=False)

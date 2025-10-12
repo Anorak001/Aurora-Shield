@@ -1,9 +1,9 @@
 @echo off
-REM Aurora Shield Docker Demo Setup Script
-REM INFOTHON 5.0 - Multi-CDN Load Balancer Environment
+REM Aurora Shield Optimized Docker Setup Script
+REM Virtual IP Attack Orchestrator with Streamlined Architecture
 
-echo [Aurora Shield] - INFOTHON 5.0 Multi-CDN Demo Setup
-echo ======================================================
+echo [Aurora Shield] - Optimized Multi-Vector Protection Platform
+echo ============================================================
 
 REM Change to the root directory where docker-compose.yml is located
 cd /d "%~dp0\.."
@@ -76,9 +76,9 @@ REM Stop any existing containers
 echo [INFO] Stopping any existing containers...
 docker-compose down --remove-orphans >nul 2>&1
 
-echo [OK] Environment cleaned. Setting up fresh environment...
+echo [OK] Environment cleaned. Setting up optimized architecture...
 
-REM Build the Aurora Shield image
+REM Build the Aurora Shield images
 echo [INFO] Building Aurora Shield Docker images...
 docker-compose build --pull
 if %errorlevel% neq 0 (
@@ -87,8 +87,8 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Start the complete environment
-echo [INFO] Starting Aurora Shield Demo Environment...
+REM Start the streamlined environment
+echo [INFO] Starting Aurora Shield Optimized Environment...
 docker-compose up -d --remove-orphans
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to start services. Please check the logs above.
@@ -103,49 +103,56 @@ timeout /t 10 /nobreak >nul
 echo.
 echo [OK] Setup complete! All services have been started.
 echo.
-echo [SUCCESS] Aurora Shield Demo Environment is ready!
+echo [SUCCESS] Aurora Shield Optimized Environment is ready!
 echo.
 echo === Main Access Points ===
 echo    Aurora Shield Dashboard: http://localhost:8080
+echo    - Comprehensive DDoS protection dashboard
+echo    - Sinkhole/Blackhole management
+echo    - Real-time attack monitoring
 echo    Login: admin/admin123 or user/user123
 echo.
-echo === CDN Services (Content Delivery Network) ===
-echo    CDN Primary (demo-webapp): http://localhost:80
-echo    CDN Secondary (demo-webapp-cdn2): http://localhost:8081
-echo    CDN Tertiary (demo-webapp-cdn3): http://localhost:8082
+echo === Virtual Attack Orchestrator (NEW) ===
+echo    Attack Orchestrator Dashboard: http://localhost:5000
+echo    - Create virtual bots across different subnets
+echo    - Simulate multi-vector DDoS attacks
+echo    - No real container spawning - lightweight virtual IPs
+echo    - Individual bot control and configuration
+echo    - Real-time attack statistics and monitoring
 echo.
-echo === Load Balancer Control Panel ===
-echo    URL: http://localhost:8090
-echo    Manage CDN restart and migration operations
-echo    Traffic routing: http://localhost:8090/cdn/ (load balanced)
-echo    Direct routing: /cdn/primary/, /cdn/secondary/, /cdn/tertiary/
+echo === CDN Services (Load Balanced) ===
+echo    Demo Application Primary: http://localhost:80
+echo    Demo Application CDN2: http://localhost:8081
+echo    Demo Application CDN3: http://localhost:8082
+echo    Load Balancer Control: http://localhost:8090
+echo    - Traffic routing and load distribution
+echo    - Service health monitoring
+echo    - CDN restart and migration operations
 echo.
-echo === Monitoring Stack ===
-echo    Kibana (Logs): http://localhost:5601
-echo    Grafana (Metrics): http://localhost:3000 (admin/admin)
-echo    Prometheus: http://localhost:9090
+echo === Key Features ===
+echo    Virtual IP Generation: Algorithm creates IPs across 8+ subnet ranges
+echo    Sinkhole Integration: All virtual attacks feed into Aurora Shield
+echo    Lightweight Architecture: 4 services instead of 12
+echo    Real-time Monitoring: Live attack statistics and bot management
+echo    Multi-subnet Attacks: Distributed attack simulation
 echo.
-echo === Attack Simulation (Independent Multi-Vector Testing) ===
-echo    Attack Simulator Web Interface 1: http://localhost:5001
-echo    Attack Simulator Web Interface 2: http://localhost:5002
-echo    Attack Simulator Web Interface 3: http://localhost:5003
-echo    Configure attacks, set request rates, target selection
-echo    Real-time attack statistics and monitoring
-echo    Each simulator can target different CDNs independently
-echo    Support for concurrent multi-vector attack scenarios
+echo === Testing Commands ===
+echo    Test Aurora Shield: curl http://localhost:8080/health
+echo    Test Attack Orchestrator: curl http://localhost:5000/health
+echo    Test Load Balancer: curl http://localhost:8090/
+echo    Test Demo App Primary: curl http://localhost:80/
+echo    Test Demo App CDN2: curl http://localhost:8081/
+echo    Test Demo App CDN3: curl http://localhost:8082/
 echo.
-echo === Load Balancer Features ===
-echo    CDN Restart: Select and restart individual CDN services
-echo    CDN Migration: Migrate traffic between CDN services
-echo    Load Distribution: Weighted routing (Primary:3, Secondary:2, Tertiary:1)
-echo    Service Status: Monitor CDN health and availability
-echo.
-echo === CDN Testing Commands ===
-echo    Test load balancer UI: curl http://localhost:8090/
-echo    Test load balanced CDNs: curl http://localhost:8090/cdn/
+echo === Virtual Bot Management (API) ===
+echo    Create HTTP Flood Bot: curl -X POST http://localhost:5000/api/bots -H "Content-Type: application/json" -d "{\"attack_type\":\"http_flood\",\"target\":\"http://localhost:8080\"}"
+echo    Create DDoS Burst Bot: curl -X POST http://localhost:5000/api/bots -H "Content-Type: application/json" -d "{\"attack_type\":\"ddos_burst\",\"target\":\"http://localhost:8080\"}"
+echo    View Bot Statistics: curl http://localhost:5000/api/bots/stats
+echo    Stop All Bots: curl -X DELETE http://localhost:5000/api/bots/stop-all
 echo.
 echo === Management Commands ===
 echo    Stop everything: docker-compose down
 echo    View logs: docker-compose logs -f [service-name]
+echo    Services: aurora-shield, attack-orchestrator, load-balancer, demo-app, demo-app-cdn2, demo-app-cdn3
 echo.
 pause
