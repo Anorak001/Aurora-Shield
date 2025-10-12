@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.4.0/backbone-min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.5.5/joint.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.5.5/joint.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.5.5/joint.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body { margin:0; padding:0; font-family:'Inter',sans-serif; overflow:hidden; background:#F9FAFB;}
@@ -148,28 +148,33 @@ function createPacket(type = 'normal') {
     });
     return packet;
 }
-function showPacketStatus(x, y, type, text) {
+
+// Show the accept/blocked status directly below the attack card
+function showPacketStatusBelow(sourceNode, type, text) {
+    const bbox = sourceNode.getBBox();
     const status = new joint.shapes.standard.Rectangle();
-    status.position(x, y);
+    // Position below the client node, aligned center
+    status.position(bbox.center().x - 40, bbox.y + bbox.height + 10);
     status.resize(80, 24);
     status.attr({
         body: {
-            fill:type==='blocked'?'#FED7D7':'#C6F6D5',
-            stroke:type==='blocked'?'#E53E3E':'#38A169',
-            strokeWidth:1,
-            rx:4, ry:4
+            fill: type === 'blocked' ? '#FED7D7' : '#C6F6D5',
+            stroke: type === 'blocked' ? '#E53E3E' : '#38A169',
+            strokeWidth: 1,
+            rx: 4, ry: 4
         },
         label: {
             text: text,
-            fill: type==='blocked'?'#E53E3E':'#38A169',
-            fontSize:12,
-            fontWeight:500,
-            fontFamily:'Inter, sans-serif'
+            fill: type === 'blocked' ? '#E53E3E' : '#38A169',
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: 'Inter, sans-serif'
         }
     });
     status.addTo(graph);
     setTimeout(() => status.remove(), 1500);
 }
+
 // Animate packet, stopping early if blocked
 function animatePacketStep(source, target, type, allowFinish, onComplete) {
     const packet = createPacket(type);
@@ -210,23 +215,22 @@ function updateStats() {
     document.getElementById('acceptedRequests').textContent = stats.accepted;
     document.getElementById('blockedRequests').textContent = stats.blocked;
 }
+
+// Uniform accept/block display below client node
 function simulateClientTraffic(client, delay) {
-    const maliciousProbability = Math.random() * 0.3;
+    const label = client.attr('label/text');
     return setInterval(() => {
         if (!simulationRunning) return;
-        const isMalicious = Math.random() < maliciousProbability;
-        const packetType = isMalicious ? 'malicious' : 'normal';
+        let isNormal = label && label.trim().toLowerCase().includes('normal traffic');
+        let packetType = isNormal ? 'normal' : 'malicious';
         stats.total++; updateStats();
-        // Show status at midpoint
-        const mx = (client.getBBox().center().x + aurora.getBBox().center().x) / 2;
-        const my = (client.getBBox().center().y + aurora.getBBox().center().y) / 2;
-        animatePacketStep(client, aurora, packetType, !isMalicious, () => {
-            if (isMalicious) {
+        animatePacketStep(client, aurora, packetType, isNormal, () => {
+            if (!isNormal) {
                 stats.blocked++; updateStats();
-                showPacketStatus(mx, my, 'blocked', 'BLOCKED');
+                showPacketStatusBelow(client, 'blocked', 'BLOCKED');
             } else {
                 stats.accepted++; updateStats();
-                showPacketStatus(mx, my, 'accepted', 'ACCEPTED');
+                showPacketStatusBelow(client, 'accepted', 'ACCEPTED');
                 setTimeout(() => {
                     animatePacket(aurora, balancer, 'accepted', () => {
                         const targetCDN = cdnNodes[Math.floor(Math.random() * cdnNodes.length)];
