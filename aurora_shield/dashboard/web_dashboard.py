@@ -8,8 +8,6 @@ import time
 import logging
 import os
 import json
-import random
-import requests
 import requests
 from datetime import datetime
 
@@ -372,147 +370,6 @@ class WebDashboard:
                 logger.error(f"Error fetching attacking IPs: {e}")
                 return jsonify({'error': 'Failed to fetch attacking IP data'}), 500
 
-        @self.app.route('/api/dashboard/attack-activity')
-        def get_detailed_attack_activity():
-            """Get detailed recent attack activity from attack orchestrator"""
-            if not self._check_auth():
-                return jsonify({'error': 'Authentication required'}), 401
-            
-            try:
-                import requests
-                from datetime import datetime, timedelta
-                
-                # Get filtering parameters
-                severity_filter = request.args.get('severity', 'all')
-                action_filter = request.args.get('action', 'all')
-                limit = int(request.args.get('limit', 20))
-                
-                # Fetch real attack data from attack orchestrator
-                attack_orchestrator_url = "http://attack-orchestrator:5000"
-                recent_attacks = []
-                
-                try:
-                    # Get active bots from attack orchestrator
-                    bots_response = requests.get(f"{attack_orchestrator_url}/api/bots", timeout=5)
-                    if bots_response.status_code == 200:
-                        bots_data = bots_response.json()
-                        
-                        for bot in bots_data.get('bots', []):
-                            # Only include active bots that have made requests
-                            if bot.get('total_requests', 0) > 0:
-                                # Calculate action taken based on success/blocked ratio
-                                total_req = bot.get('total_requests', 0)
-                                blocked_req = bot.get('blocked_requests', 0)
-                                successful_req = bot.get('successful_requests', 0)
-                                
-                                if blocked_req > successful_req:
-                                    action_taken = 'Blocked'
-                                    severity = 'high'
-                                elif blocked_req > 0:
-                                    action_taken = 'Rate Limited'
-                                    severity = 'medium'
-                                else:
-                                    action_taken = 'Monitored'
-                                    severity = 'low'
-                                
-                                # Map attack types to display names
-                                attack_type_mapping = {
-                                    'http_flood': 'HTTP Flood',
-                                    'ddos_burst': 'DDoS Burst',
-                                    'brute_force': 'Brute Force',
-                                    'slowloris': 'Slowloris',
-                                    'resource_exhaustion': 'Resource Exhaustion',
-                                    'normal': 'Normal Traffic'
-                                }
-                                
-                                attack_type = attack_type_mapping.get(
-                                    bot.get('attack_type', 'unknown'),
-                                    bot.get('attack_type', 'Unknown').title()
-                                )
-                                
-                                # Use last_activity timestamp if available
-                                timestamp = datetime.fromtimestamp(
-                                    bot.get('last_activity', bot.get('start_time', time.time()))
-                                ).isoformat()
-                                
-                                recent_attacks.append({
-                                    'ip': bot.get('ip', 'Unknown'),
-                                    'timestamp': timestamp,
-                                    'attack_type': attack_type,
-                                    'action_taken': action_taken,
-                                    'severity': severity,
-                                    'total_requests': total_req,
-                                    'blocked_requests': blocked_req,
-                                    'bot_id': bot.get('id', 'unknown'),
-                                    'status': bot.get('status', 'unknown')
-                                })
-                
-                except requests.RequestException as e:
-                    logger.warning(f"Could not connect to attack orchestrator: {e}")
-                    # Fall back to shield manager data if available
-                    for request_info in self.shield_manager.recent_requests[-20:]:
-                        # Include all action types from shield manager
-                        status = request_info.get('status')
-                        if status in ['blocked', 'sinkholed', 'blackholed', 'quarantined', 'rate-limited', 'challenged']:
-                            recent_attacks.append({
-                                'ip': request_info.get('ip', 'Unknown'),
-                                'timestamp': request_info.get('timestamp_iso', datetime.now().isoformat()),
-                                'attack_type': self._map_status_to_attack_type(status),
-                                'action_taken': self._map_status_to_action(status),
-                                'severity': self._get_attack_severity_from_status(status),
-                                'total_requests': 1,
-                                'blocked_requests': 1 if status in ['blocked', 'blackholed'] else 0,
-                                'bot_id': 'shield-manager',
-                                'status': status
-                            })
-                
-                # Apply filters
-                if severity_filter != 'all':
-                    recent_attacks = [a for a in recent_attacks if a['severity'] == severity_filter]
-                    
-                if action_filter != 'all':
-                    recent_attacks = [a for a in recent_attacks if a['action_taken'].lower().replace(' ', '-') == action_filter]
-                
-                # Sort by timestamp (most recent first)
-                recent_attacks.sort(key=lambda x: x['timestamp'], reverse=True)
-                
-                # Calculate statistics from real data
-                statistics = {
-                    'total_attacks': len(recent_attacks),
-                    'by_severity': {
-                        'critical': len([a for a in recent_attacks if a['severity'] == 'critical']),
-                        'high': len([a for a in recent_attacks if a['severity'] == 'high']),
-                        'medium': len([a for a in recent_attacks if a['severity'] == 'medium']),
-                        'low': len([a for a in recent_attacks if a['severity'] == 'low'])
-                    },
-                    'by_action': {
-                        'blocked': len([a for a in recent_attacks if 'blocked' in a['action_taken'].lower()]),
-                        'sinkholed': len([a for a in recent_attacks if 'sinkholed' in a['action_taken'].lower()]),
-                        'blackholed': len([a for a in recent_attacks if 'blackholed' in a['action_taken'].lower()]),
-                        'quarantined': len([a for a in recent_attacks if 'quarantined' in a['action_taken'].lower()]),
-                        'rate-limited': len([a for a in recent_attacks if 'rate' in a['action_taken'].lower()]),
-                        'challenged': len([a for a in recent_attacks if 'challenge' in a['action_taken'].lower()]),
-                        'monitored': len([a for a in recent_attacks if 'monitor' in a['action_taken'].lower()])
-                    },
-                    'unique_ips': len(set(a['ip'] for a in recent_attacks)),
-                    'total_requests': sum(a.get('total_requests', 0) for a in recent_attacks),
-                    'total_blocked': sum(a.get('blocked_requests', 0) for a in recent_attacks)
-                }
-                
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'attacks': recent_attacks[:limit],
-                        'statistics': statistics
-                    }
-                })
-                
-            except Exception as e:
-                logger.error(f"Error fetching attack activity: {e}")
-                return jsonify({'error': str(e)}), 500
-                logger.error(f"Error fetching attack activity: {e}")
-                return jsonify({'error': 'Failed to fetch attack activity'}), 500
-
         @self.app.route('/api/sinkhole/add', methods=['POST'])
         def add_to_sinkhole():
             """Add IP/subnet/fingerprint to sinkhole"""
@@ -614,89 +471,27 @@ class WebDashboard:
                 logger.error(f"Error toggling mitigation {mitigation_type}: {e}")
                 return jsonify({'error': f'Failed to toggle {mitigation_type}'}), 500
 
-        @self.app.route('/api/dashboard/reset-stats', methods=['POST'])
-        def reset_load_balancer_stats():
-            """Reset load balancer statistics."""
-            if not self._check_auth():
-                return jsonify({'error': 'Authentication required'}), 401
-            
-            try:
-                # Call the load balancer's reset stats endpoint
-                import requests
-                response = requests.post('http://load-balancer:8090/api/reset-stats', timeout=5)
-                
-                if response.status_code == 200:
-                    logger.info("Load balancer statistics reset successfully")
-                    return jsonify({
-                        'success': True,
-                        'message': 'Load balancer statistics reset successfully',
-                        'timestamp': response.json().get('timestamp')
-                    })
-                else:
-                    logger.error(f"Failed to reset load balancer stats: {response.status_code}")
-                    return jsonify({'error': 'Failed to reset load balancer statistics'}), 500
-                    
-            except Exception as e:
-                logger.error(f"Error resetting load balancer stats: {e}")
-                return jsonify({'error': f'Failed to reset statistics: {str(e)}'}), 500
-
         @self.app.route('/api/dashboard/config')
         def get_config():
-            """Get current configuration with real values from shield manager."""
+            """Export current configuration."""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
             
             try:
-                from aurora_shield.config.default_config import DEFAULT_CONFIG
-                
-                # Get current configuration from shield manager
-                current_config = getattr(self.shield_manager, 'config', DEFAULT_CONFIG)
-                
                 config = {
                     'version': '2.0.0',
                     'protection_enabled': True,
-                    'rate_limiter': {
-                        'enabled': True,
-                        'rate': current_config.get('rate_limiter', {}).get('rate', 10),
-                        'burst': current_config.get('rate_limiter', {}).get('burst', 20),
-                        'window_size': current_config.get('rate_limiter', {}).get('window_size', 60)
-                    },
-                    'anomaly_detector': {
-                        'enabled': True,
-                        'request_window': current_config.get('anomaly_detector', {}).get('request_window', 60),
-                        'rate_threshold': current_config.get('anomaly_detector', {}).get('rate_threshold', 100),
-                        'sensitivity': current_config.get('anomaly_detector', {}).get('sensitivity', 'medium')
-                    },
-                    'ip_reputation': {
-                        'enabled': True,
-                        'initial_score': current_config.get('ip_reputation', {}).get('initial_score', 100),
-                        'reputation_threshold': current_config.get('ip_reputation', {}).get('reputation_threshold', 50),
-                        'decay_rate': current_config.get('ip_reputation', {}).get('decay_rate', 0.1)
-                    },
-                    'challenge_response': {
-                        'enabled': True,
-                        'challenge_timeout': current_config.get('challenge_response', {}).get('challenge_timeout', 300),
-                        'difficulty': current_config.get('challenge_response', {}).get('difficulty', 'medium'),
-                        'max_attempts': current_config.get('challenge_response', {}).get('max_attempts', 3)
-                    },
-                    'sinkhole': {
-                        'enabled': True,
-                        'auto_sinkhole_enabled': True,
-                        'zero_reputation_threshold': 0,
-                        'queue_fairness_enabled': True,
-                        'queue_max_size': 1000
+                    'mitigations': {
+                        'rate_limiting': {'enabled': True, 'threshold': 100},
+                        'challenge_response': {'enabled': True, 'difficulty': 'medium'},
+                        'ip_reputation': {'enabled': True, 'strict_mode': False},
+                        'bot_detection': {'enabled': True, 'sensitivity': 'high'},
+                        'adaptive_learning': {'enabled': True, 'learning_rate': 0.01}
                     },
                     'thresholds': {
                         'requests_per_second': 1000,
                         'connection_limit': 10000,
-                        'response_time_limit': 5000,
-                        'cpu_threshold': 80,
-                        'memory_threshold': 85
-                    },
-                    'dashboard': {
-                        'host': current_config.get('dashboard', {}).get('host', '0.0.0.0'),
-                        'port': current_config.get('dashboard', {}).get('port', 8080),
-                        'refresh_interval': 5
+                        'response_time_limit': 5000
                     },
                     'exported_at': datetime.now().isoformat()
                 }
@@ -704,42 +499,8 @@ class WebDashboard:
                 return jsonify(config)
                 
             except Exception as e:
-                logger.error(f"Error getting config: {e}")
-                return jsonify({'error': 'Failed to get configuration'}), 500
-
-        @self.app.route('/api/dashboard/config', methods=['POST'])
-        def update_config():
-            """Update configuration parameters."""
-            if not self._check_auth():
-                return jsonify({'error': 'Authentication required'}), 401
-            
-            if session.get('role') != 'admin':
-                return jsonify({'error': 'Admin privileges required'}), 403
-            
-            try:
-                config_updates = request.get_json()
-                if not config_updates:
-                    return jsonify({'error': 'No configuration data provided'}), 400
-                
-                # Validate and apply configuration updates
-                validation_result = self._validate_config_updates(config_updates)
-                if not validation_result['valid']:
-                    return jsonify({'error': validation_result['error']}), 400
-                
-                # Apply configuration to shield manager
-                self._apply_config_updates(config_updates)
-                
-                logger.info(f"Configuration updated by {session.get('user_id', 'unknown')}")
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Configuration updated successfully',
-                    'updated_at': datetime.now().isoformat()
-                })
-                
-            except Exception as e:
-                logger.error(f"Error updating config: {e}")
-                return jsonify({'error': 'Failed to update configuration'}), 500
+                logger.error(f"Error exporting config: {e}")
+                return jsonify({'error': 'Failed to export configuration'}), 500
 
         @self.app.route('/health')
         def health_check():
@@ -749,33 +510,6 @@ class WebDashboard:
                 'timestamp': datetime.now().isoformat(),
                 'version': '2.0.0'
             })
-
-        @self.app.route('/api/debug/reputation')
-        def debug_reputation_scores():
-            """Debug endpoint to get current IP reputation scores."""
-            try:
-                # Call the debug method to log reputation scores
-                tracked_count = self.shield_manager.debug_print_reputation_scores()
-                
-                # Also return the data in JSON format
-                reputation_data = {}
-                if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
-                    for ip, score in self.shield_manager.ip_reputation.reputation_scores.items():
-                        violations = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
-                        reputation_data[ip] = {
-                            'score': score,
-                            'violations': violations
-                        }
-                
-                return jsonify({
-                    'success': True,
-                    'tracked_ips': tracked_count,
-                    'reputation_scores': reputation_data,
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception as e:
-                logger.error(f"Error in debug reputation endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
 
     def _get_uptime(self):
         """Get system uptime in a human-readable format."""
@@ -836,48 +570,39 @@ class WebDashboard:
         return f"{hours}h {minutes}m"
 
     def _get_performance_metrics(self):
-        """Get current performance metrics including real IP reputation data."""
+        """Get current performance metrics including IP reputation data."""
         try:
             # Get real IP request counts from shield manager
             live_data = self.shield_manager.get_live_requests()
             ip_counts = live_data.get('ip_request_counts', {})
             
-            # Get actual IP reputation scores from the IP reputation system
+            # Get recent requests for IP reputation analysis
+            recent_requests = live_data.get('requests', [])
             ip_reputation_data = {}
             
-            # Get all tracked IPs from the reputation system
-            if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
-                for ip in self.shield_manager.ip_reputation.reputation_scores:
-                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
-                    
-                    # Get violation history count
-                    violation_count = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
-                    
-                    ip_reputation_data[ip] = {
-                        'reputation_score': reputation_info['score'],
-                        'status': reputation_info['status'],
-                        'allowed': reputation_info['allowed'],
-                        'violation_count': violation_count,
-                        'total_requests': ip_counts.get(ip, 0),
-                        'is_blacklisted': ip in self.shield_manager.ip_reputation.blacklist,
-                        'is_whitelisted': ip in self.shield_manager.ip_reputation.whitelist
-                    }
-            
-            # Also include IPs from recent requests that might not be in reputation system yet
-            recent_requests = live_data.get('requests', [])
+            # Analyze IP behavior for reputation scoring
             for request in recent_requests:
                 ip = request.get('ip', 'unknown')
-                if ip not in ip_reputation_data and ip != 'unknown':
-                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
+                status = request.get('status', 'allowed')
+                
+                if ip not in ip_reputation_data:
                     ip_reputation_data[ip] = {
-                        'reputation_score': reputation_info['score'],
-                        'status': reputation_info['status'],
-                        'allowed': reputation_info['allowed'],
-                        'violation_count': 0,
-                        'total_requests': ip_counts.get(ip, 0),
-                        'is_blacklisted': False,
-                        'is_whitelisted': False
+                        'total_requests': 0,
+                        'blocked_requests': 0,
+                        'allowed_requests': 0,
+                        'reputation_score': 100
                     }
+                
+                ip_reputation_data[ip]['total_requests'] += 1
+                
+                if status in ['blocked', 'rate-limited', 'blackholed', 'sinkholed']:
+                    ip_reputation_data[ip]['blocked_requests'] += 1
+                else:
+                    ip_reputation_data[ip]['allowed_requests'] += 1
+                
+                # Calculate reputation score based on behavior
+                blocked_ratio = ip_reputation_data[ip]['blocked_requests'] / ip_reputation_data[ip]['total_requests']
+                ip_reputation_data[ip]['reputation_score'] = max(0, 100 - (blocked_ratio * 100))
             
             return {
                 'response_time_ms': 45,
@@ -895,251 +620,6 @@ class WebDashboard:
                 'ip_request_counts': {},
                 'ip_reputation_data': {}
             }
-
-    def _validate_config_updates(self, config_updates):
-        """Validate configuration updates."""
-        try:
-            # Define validation rules
-            validation_rules = {
-                'rate_limiter': {
-                    'rate': {'type': (int, float), 'min': 1, 'max': 10000},
-                    'burst': {'type': (int, float), 'min': 1, 'max': 1000},
-                    'window_size': {'type': int, 'min': 1, 'max': 3600}
-                },
-                'anomaly_detector': {
-                    'request_window': {'type': int, 'min': 1, 'max': 3600},
-                    'rate_threshold': {'type': int, 'min': 1, 'max': 100000},
-                    'sensitivity': {'type': str, 'choices': ['low', 'medium', 'high']}
-                },
-                'ip_reputation': {
-                    'initial_score': {'type': int, 'min': 0, 'max': 100},
-                    'reputation_threshold': {'type': int, 'min': 0, 'max': 100},
-                    'decay_rate': {'type': (int, float), 'min': 0, 'max': 1}
-                },
-                'challenge_response': {
-                    'challenge_timeout': {'type': int, 'min': 10, 'max': 3600},
-                    'difficulty': {'type': str, 'choices': ['easy', 'medium', 'hard']},
-                    'max_attempts': {'type': int, 'min': 1, 'max': 10}
-                },
-                'thresholds': {
-                    'requests_per_second': {'type': int, 'min': 10, 'max': 100000},
-                    'connection_limit': {'type': int, 'min': 10, 'max': 1000000},
-                    'response_time_limit': {'type': int, 'min': 100, 'max': 30000},
-                    'cpu_threshold': {'type': int, 'min': 10, 'max': 95},
-                    'memory_threshold': {'type': int, 'min': 10, 'max': 95}
-                }
-            }
-            
-            # Validate each section
-            for section, values in config_updates.items():
-                if section not in validation_rules:
-                    continue
-                    
-                if not isinstance(values, dict):
-                    return {'valid': False, 'error': f'Invalid format for section {section}'}
-                
-                for key, value in values.items():
-                    if key not in validation_rules[section]:
-                        continue
-                    
-                    rule = validation_rules[section][key]
-                    
-                    # Type validation
-                    if not isinstance(value, rule['type']):
-                        return {'valid': False, 'error': f'Invalid type for {section}.{key}'}
-                    
-                    # Range validation
-                    if 'min' in rule and value < rule['min']:
-                        return {'valid': False, 'error': f'{section}.{key} must be >= {rule["min"]}'}
-                    
-                    if 'max' in rule and value > rule['max']:
-                        return {'valid': False, 'error': f'{section}.{key} must be <= {rule["max"]}'}
-                    
-                    # Choice validation
-                    if 'choices' in rule and value not in rule['choices']:
-                        return {'valid': False, 'error': f'{section}.{key} must be one of {rule["choices"]}'}
-            
-            return {'valid': True}
-            
-        except Exception as e:
-            return {'valid': False, 'error': f'Validation error: {str(e)}'}
-
-    def _apply_config_updates(self, config_updates):
-        """Apply configuration updates to the shield manager."""
-        try:
-            # Update shield manager configuration
-            if hasattr(self.shield_manager, 'config'):
-                for section, values in config_updates.items():
-                    if section in self.shield_manager.config:
-                        self.shield_manager.config[section].update(values)
-                    else:
-                        self.shield_manager.config[section] = values
-            
-            # Apply specific updates to components
-            if 'rate_limiter' in config_updates:
-                if hasattr(self.shield_manager, 'rate_limiter'):
-                    rate_config = config_updates['rate_limiter']
-                    if 'rate' in rate_config:
-                        self.shield_manager.rate_limiter.rate = rate_config['rate']
-                    if 'burst' in rate_config:
-                        self.shield_manager.rate_limiter.burst = rate_config['burst']
-            
-            if 'anomaly_detector' in config_updates:
-                if hasattr(self.shield_manager, 'anomaly_detector'):
-                    anomaly_config = config_updates['anomaly_detector']
-                    if 'request_window' in anomaly_config:
-                        self.shield_manager.anomaly_detector.request_window = anomaly_config['request_window']
-                    if 'rate_threshold' in anomaly_config:
-                        self.shield_manager.anomaly_detector.rate_threshold = anomaly_config['rate_threshold']
-            
-            # Log the configuration change
-            logger.info(f"Applied configuration updates: {config_updates}")
-            
-        except Exception as e:
-            logger.error(f"Error applying config updates: {e}")
-            raise
-
-    def _get_country_from_ip(self, ip):
-        """Get country from IP address (simplified)"""
-        if not ip:
-            return 'Unknown'
-        
-        # Simple IP to country mapping for demo
-        ip_country_map = {
-            '192.168.': 'Local Network',
-            '10.0.': 'Private Network',
-            '172.16.': 'Private Network',
-            '203.0.113.': 'Documentation',
-            '198.51.100.': 'Test Network',
-            '45.76.': 'Russia',
-            '185.220.': 'Germany',
-            '77.234.': 'China'
-        }
-        
-        for ip_prefix, country in ip_country_map.items():
-            if ip.startswith(ip_prefix):
-                return country
-        
-        return 'Unknown'
-
-    def _get_attack_severity(self, attack_type):
-        """Determine attack severity based on type"""
-        if not attack_type:
-            return 'Low'
-        
-        attack_type_lower = attack_type.lower()
-        
-        if any(term in attack_type_lower for term in ['sql injection', 'command injection', 'zero-day', 'buffer overflow']):
-            return 'Critical'
-        elif any(term in attack_type_lower for term in ['xss', 'csrf', 'path traversal', 'ddos', 'brute force']):
-            return 'High'
-        elif any(term in attack_type_lower for term in ['bot detection', 'scanner', 'suspicious']):
-            return 'Medium'
-        else:
-            return 'Low'
-
-    def _generate_malicious_user_agent(self):
-        """Generate realistic malicious user agents"""
-        malicious_agents = [
-            'sqlmap/1.4.7#stable',
-            'Mozilla/5.0 (compatible; Nmap Scripting Engine)',
-            'python-requests/2.25.1',
-            'curl/7.68.0',
-            'Wget/1.20.3',
-            'Mozilla/5.0 AttackBot/1.0',
-            'masscan/1.3.2',
-            'Nikto/2.1.6',
-            'gobuster/3.1.0',
-            'dirb/2.22'
-        ]
-        
-        return random.choice(malicious_agents)
-
-    def _generate_attack_uri(self, attack_type):
-        """Generate realistic attack URIs based on attack type"""
-        if not attack_type:
-            return '/'
-        
-        attack_type_lower = attack_type.lower()
-        
-        if 'sql injection' in attack_type_lower:
-            return "/login?id=1' OR '1'='1"
-        elif 'xss' in attack_type_lower:
-            return "/search?q=<script>alert('xss')</script>"
-        elif 'path traversal' in attack_type_lower:
-            return "/file?path=../../../etc/passwd"
-        elif 'command injection' in attack_type_lower:
-            return "/exec?cmd=; rm -rf /"
-        elif 'brute force' in attack_type_lower:
-            return "/admin/login"
-        elif 'scanner' in attack_type_lower:
-            return "/admin/config.php"
-        elif 'bot' in attack_type_lower:
-            return "/robots.txt"
-        else:
-            return "/"
-
-    def _calculate_attack_stats(self, recent_attacks):
-        """Calculate attack statistics"""
-        if not recent_attacks:
-            return {
-                'total_attacks': 0,
-                'attacks_by_type': {},
-                'attacks_by_action': {},
-                'attacks_by_severity': {},
-                'top_attacking_ips': []
-            }
-        
-        # Count attacks by type
-        attacks_by_type = {}
-        attacks_by_action = {}
-        attacks_by_severity = {}
-    
-    def _map_status_to_attack_type(self, status):
-        """Map request status to attack type"""
-        status_mapping = {
-            'blocked': 'Malicious Request',
-            'blackholed': 'Critical Threat',
-            'sinkholed': 'Suspicious Activity',
-            'quarantined': 'Potential Threat',
-            'rate-limited': 'Rate Limit Exceeded',
-            'challenged': 'Challenge Required'
-        }
-        return status_mapping.get(status, 'Unknown Attack')
-    
-    def _map_status_to_action(self, status):
-        """Map request status to action taken"""
-        action_mapping = {
-            'blocked': 'Blocked',
-            'blackholed': 'Blackholed',
-            'sinkholed': 'Sinkholed',
-            'quarantined': 'Quarantined',
-            'rate-limited': 'Rate Limited',
-            'challenged': 'Challenged'
-        }
-        return action_mapping.get(status, 'Monitored')
-    
-    def _get_attack_severity_from_status(self, status):
-        """Get attack severity based on status"""
-        severity_mapping = {
-            'blocked': 'high',
-            'blackholed': 'critical',
-            'sinkholed': 'high',
-            'quarantined': 'critical',
-            'rate-limited': 'medium',
-            'challenged': 'low'
-        }
-        return severity_mapping.get(status, 'low')
-
-    def start(self):
-        """Start the dashboard server"""
-        logger.info("Starting Aurora Shield Dashboard...")
-        self.app.run(
-            host='0.0.0.0',
-            port=5001,
-            debug=False,
-            threaded=True
-        )
 
     def run(self, host='0.0.0.0', port=8080, debug=False):
         """Run the enhanced dashboard server."""
