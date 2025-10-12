@@ -931,6 +931,7 @@
         .request-entry {
             display: flex;
             align-items: center;
+            gap: 20px;
             padding: 8px 0;
             border-bottom: 1px solid rgba(255,255,255,0.03);
             animation: slideIn 0.3s ease;
@@ -947,18 +948,18 @@
 
         .request-timestamp {
             color: var(--muted);
-            width: 80px;
+            width: 110px;
             flex-shrink: 0;
         }
 
         .request-ip {
             color: var(--accent-2);
-            width: 120px;
+            width: 150px;
             flex-shrink: 0;
         }
 
         .request-method {
-            width: 60px;
+            width: 70px;
             flex-shrink: 0;
             font-weight: 600;
         }
@@ -966,11 +967,10 @@
         .request-url {
             flex: 1;
             color: #dbe6ff;
-            margin: 0 12px;
         }
 
         .request-status {
-            width: 80px;
+            width: 100px;
             text-align: right;
             font-weight: 600;
         }
@@ -1119,10 +1119,6 @@
                     <h1>🛡️ Aurora Shield Dashboard</h1>
                     <p>Real-time DDoS protection monitoring and mitigation controls</p>
                 </div>
-                <div style="text-align: right; color: var(--muted);">
-                    <div id="system-clock" style="font-size: 18px; font-weight: bold; color: var(--primary);"></div>
-                    <div style="font-size: 12px;">System Time</div>
-                </div>
             </div>
         </div>
         
@@ -1164,6 +1160,10 @@
                     <div class="stat-card">
                         <div class="stat-value" id="active-mitigations">3</div>
                         <div class="stat-label">Active Mitigations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="system-clock" style="font-size: 16px; font-weight: bold;">--:--:--</div>
+                        <div class="stat-label">System Time</div>
                     </div>
                 </div>
                 
@@ -2520,7 +2520,7 @@
 
         function updateSystemClock() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+            const timeString = now.toLocaleTimeString();
             const clockElement = document.getElementById('system-clock');
             if (clockElement) {
                 clockElement.textContent = timeString;
