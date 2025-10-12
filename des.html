@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Attack Simulator Architecture</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.4.0/backbone-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.5.5/joint.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.5.5/joint.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { margin:0; padding:0; font-family:'Inter',sans-serif; overflow:hidden; background:#F9FAFB;}
+        #paper { width:100vw; height:100vh; border:1px solid #ddd;}
+        .controls { position:fixed; bottom:20px; right:20px; background:white; padding:15px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); z-index:1000; display:flex; flex-direction:column; gap:10px;}
+        button { margin:0; padding:10px 20px; cursor:pointer; border:1px solid #ddd; border-radius:6px; background:white; font-family:'Inter',sans-serif; font-weight:500; transition:all 0.2s;}
+        button:hover { background:#f0f0f0; transform:translateY(-1px);}
+        button.simulate { background:#4299E1; color:white; border:none;}
+        button.simulate:hover { background:#3182ce;}
+        .legend { position:fixed; top:20px; right:20px; background:white; padding:15px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); font-size:14px;}
+        .stats { position:fixed; top:20px; left:20px; background:white; padding:15px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); font-size:14px; line-height:1.6;}
+        #totalRequests { color:#4299E1; font-weight:bold;}
+        #acceptedRequests { color:#38A169; font-weight:bold;}
+        #blockedRequests { color:#E53E3E; font-weight:bold;}
+        .legend-item { display:flex; align-items:center; margin:5px 0;}
+        .legend-color { width:12px; height:12px; margin-right:8px; border-radius:3px;}
+    </style>
+</head>
+<body>
+<div id="paper"></div>
+<div class="controls">
+    <button onclick="zoomIn()">Zoom In (+)</button>
+    <button onclick="zoomOut()">Zoom Out (-)</button>
+    <button onclick="resetView()">Reset View</button>
+    <button class="simulate" onclick="toggleSimulation()">Start Simulation</button>
+</div>
+<div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:#2D9CDB"></div><span>Clients</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#27AE60"></div><span>Aurora Shield</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#F2C94C"></div><span>Load Balancer</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#BB6BD9"></div><span>CDN Nodes</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#4299E1"></div><span>Normal Request</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#E53E3E"></div><span>Malicious Request</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#38A169"></div><span>Accepted Request</span></div>
+</div>
+<div class="stats">
+    <div>Total Requests: <span id="totalRequests">0</span></div>
+    <div>Accepted: <span id="acceptedRequests">0</span></div>
+    <div>Blocked: <span id="blockedRequests">0</span></div>
+</div>
+<script>
+const graph = new joint.dia.Graph();
+const paper = new joint.dia.Paper({
+    el: document.getElementById('paper'),
+    model: graph,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    gridSize: 10,
+    drawGrid: { name: 'mesh', args: { color: '#e0e0e0'} },
+    background: { color: '#F9FAFB'},
+    interactive: true
+});
+function createNode(x, y, width, height, label, color) {
+    const rect = new joint.shapes.standard.Rectangle();
+    rect.position(x, y);
+    rect.resize(width, height);
+    rect.attr({
+        body: {
+            fill: color,
+            rx: 12, ry: 12,
+            strokeWidth: 2, stroke: 'none',
+            shadowColor: 'rgba(0,0,0,0.2)', shadowBlur: 10,
+            shadowOffsetX: 0, shadowOffsetY: 5
+        },
+        label: {
+            text: label,
+            fill: 'white',
+            fontSize: 14, fontWeight: 500,
+            fontFamily: 'Inter, sans-serif'
+        }
+    });
+    return rect;
+}
+const orchestrator = createNode(520, 80, 200, 70, '🛡️ Attack Orchestrator', '#22223B');
+const clients = [
+    createNode(340, 200, 180, 60, '💻 http flood request', '#2D9CDB'),
+    createNode(540, 200, 180, 60, '💻 brute force', '#2D9CDB'),
+    createNode(740, 200, 180, 60, '💻 normal traffic', '#2D9CDB'),
+    createNode(940, 200, 180, 60, '💻 swarm/bots', '#2D9CDB')
+];
+const aurora = createNode(520, 340, 200, 80, '🛡️ Aurora Shield\nTraffic Filtering', '#27AE60');
+const balancer = createNode(520, 480, 200, 80, '⚖️ Load Balancer\nPort 8090', '#F2C94C');
+const cdnNodes = [
+    createNode(240, 610, 180, 60, '📡 CDN Node #1\nPort 80', '#BB6BD9'),
+    createNode(520, 610, 180, 60, '📡 CDN Node #2\nPort 8081', '#BB6BD9'),
+    createNode(800, 610, 180, 60, '📡 CDN Node #3\nPort 8082', '#BB6BD9')
+];
+graph.addCells([orchestrator, ...clients, aurora, balancer, ...cdnNodes]);
+function createLink(source, target) {
+    return new joint.shapes.standard.Link({
+        source: { id: source.id },
+        target: { id: target.id },
+        router: { name: 'manhattan' },
+        connector: { name: 'rounded' },
+        attrs: {
+            line: {
+                stroke: '#333',
+                strokeWidth: 2,
+                strokeDasharray: '0',
+                targetMarker: {type:'path',d:'M 10 -5 0 0 10 5 Z'}
+            }
+        }
+    });
+}
+graph.addCells([
+    ...clients.map(client => createLink(orchestrator, client)),
+    ...clients.map(client => createLink(client, aurora)),
+    createLink(aurora, balancer),
+    ...cdnNodes.map(cdn => createLink(balancer, cdn))
+]);
+function centerContent() {
+    const contentBBox = graph.getBBox();
+    const paperWidth = paper.el.clientWidth;
+    const paperHeight = paper.el.clientHeight;
+    paper.translate((paperWidth - contentBBox.width)/2 - contentBBox.x, (paperHeight - contentBBox.height)/2 - contentBBox.y);
+}
+centerContent();
+window.addEventListener('resize', () => { paper.setDimensions(window.innerWidth, window.innerHeight); centerContent(); });
+
+function createPacket(type = 'normal') {
+    let color, size;
+    switch(type) {
+        case 'malicious': color = '#E53E3E'; size = 14; break;
+        case 'blocked': color = '#822727'; size = 14; break;
+        case 'accepted': color = '#38A169'; size = 12; break;
+        default: color = '#4299E1'; size = 12;
+    }
+    const packet = new joint.shapes.standard.Circle({
+        size: { width: size, height: size },
+        attrs: {
+            body: {
+                fill: color,
+                stroke: 'white',
+                strokeWidth: 2,
+                opacity: 0.9
+            }
+        }
+    });
+    return packet;
+}
+function showPacketStatus(x, y, type, text) {
+    const status = new joint.shapes.standard.Rectangle();
+    status.position(x, y);
+    status.resize(80, 24);
+    status.attr({
+        body: {
+            fill:type==='blocked'?'#FED7D7':'#C6F6D5',
+            stroke:type==='blocked'?'#E53E3E':'#38A169',
+            strokeWidth:1,
+            rx:4, ry:4
+        },
+        label: {
+            text: text,
+            fill: type==='blocked'?'#E53E3E':'#38A169',
+            fontSize:12,
+            fontWeight:500,
+            fontFamily:'Inter, sans-serif'
+        }
+    });
+    status.addTo(graph);
+    setTimeout(() => status.remove(), 1500);
+}
+// Animate packet, stopping early if blocked
+function animatePacketStep(source, target, type, allowFinish, onComplete) {
+    const packet = createPacket(type);
+    const sourceCenter = source.getBBox().center();
+    const targetCenter = target.getBBox().center();
+    packet.position(sourceCenter.x - 6, sourceCenter.y - 6);
+    packet.addTo(graph);
+    const existingLinks = graph.getLinks().filter(link => link.getSourceCell() === source && link.getTargetCell() === target);
+    const pathElement = paper.findViewByModel(existingLinks[0]).el.querySelector('path');
+    const length = pathElement.getTotalLength();
+    let start = null;
+    const duration = 1000;
+    function animate(timestamp) {
+        if (!start) start = timestamp;
+        const maxProgress = allowFinish ? 1 : 0.8;
+        const progress = Math.min((timestamp - start) / duration, maxProgress);
+        const point = pathElement.getPointAtLength(length * progress);
+        packet.position(point.x - 6, point.y - 6);
+        if (progress < maxProgress) {
+            requestAnimationFrame(animate);
+        } else {
+            if (!allowFinish) {
+                setTimeout(() => { packet.attr('body/opacity', 0); setTimeout(() => packet.remove(), 300); }, 300);
+            } else {
+                packet.remove();
+            }
+            if (onComplete) onComplete();
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+let simulationRunning = false;
+let simulationIntervals = [];
+let stats = { total: 0, accepted: 0, blocked: 0 };
+function updateStats() {
+    document.getElementById('totalRequests').textContent = stats.total;
+    document.getElementById('acceptedRequests').textContent = stats.accepted;
+    document.getElementById('blockedRequests').textContent = stats.blocked;
+}
+function simulateClientTraffic(client, delay) {
+    const maliciousProbability = Math.random() * 0.3;
+    return setInterval(() => {
+        if (!simulationRunning) return;
+        const isMalicious = Math.random() < maliciousProbability;
+        const packetType = isMalicious ? 'malicious' : 'normal';
+        stats.total++; updateStats();
+        // Show status at midpoint
+        const mx = (client.getBBox().center().x + aurora.getBBox().center().x) / 2;
+        const my = (client.getBBox().center().y + aurora.getBBox().center().y) / 2;
+        animatePacketStep(client, aurora, packetType, !isMalicious, () => {
+            if (isMalicious) {
+                stats.blocked++; updateStats();
+                showPacketStatus(mx, my, 'blocked', 'BLOCKED');
+            } else {
+                stats.accepted++; updateStats();
+                showPacketStatus(mx, my, 'accepted', 'ACCEPTED');
+                setTimeout(() => {
+                    animatePacket(aurora, balancer, 'accepted', () => {
+                        const targetCDN = cdnNodes[Math.floor(Math.random() * cdnNodes.length)];
+                        setTimeout(() => { animatePacket(balancer, targetCDN, 'accepted'); }, 100);
+                    });
+                }, 200);
+            }
+        });
+    }, delay);
+}
+function animatePacket(source, target, type, onComplete) {
+    const packet = createPacket(type);
+    const sourceCenter = source.getBBox().center();
+    const targetCenter = target.getBBox().center();
+    packet.position(sourceCenter.x - 6, sourceCenter.y - 6);
+    packet.addTo(graph);
+    const existingLinks = graph.getLinks().filter(link => link.getSourceCell() === source && link.getTargetCell() === target);
+    const pathElement = paper.findViewByModel(existingLinks[0]).el.querySelector('path');
+    const length = pathElement.getTotalLength();
+    let start = null;
+    const duration = 1000;
+    function animate(timestamp) {
+        if (!start) start = timestamp;
+        const progress = (timestamp - start) / duration;
+        if (progress < 1) {
+            const point = pathElement.getPointAtLength(length * progress);
+            packet.position(point.x - 6, point.y - 6);
+            requestAnimationFrame(animate);
+        } else {
+            packet.remove();
+            if (onComplete) onComplete();
+        }
+    }
+    requestAnimationFrame(animate);
+}
+function toggleSimulation() {
+    const button = document.querySelector('.simulate');
+    if (simulationRunning) {
+        simulationRunning = false;
+        simulationIntervals.forEach(clearInterval);
+        simulationIntervals = [];
+        button.textContent = 'Start Simulation';
+        button.style.background = '#4299E1';
+    } else {
+        simulationRunning = true;
+        button.textContent = 'Stop Simulation';
+        button.style.background = '#E53E3E';
+        stats = { total: 0, accepted: 0, blocked: 0 };
+        updateStats();
+        clients.forEach((client, index) => {
+            const baseDelay = 800;
+            const interval = simulateClientTraffic(client, baseDelay + index * 200);
+            simulationIntervals.push(interval);
+        });
+    }
+}
+let currentScale = 1;
+const zoomStep = 0.1, minScale = 0.4, maxScale = 2;
+function zoomIn() { if (currentScale < maxScale) { currentScale += zoomStep; paper.scale(currentScale);} }
+function zoomOut() { if (currentScale > minScale) { currentScale -= zoomStep; paper.scale(currentScale);} }
+function resetView() { currentScale = 1; paper.scale(1); centerContent(); }
+</script>
+</body>
+</html>
