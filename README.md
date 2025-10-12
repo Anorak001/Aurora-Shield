@@ -8,13 +8,27 @@ Aurora Shield demonstrates enterprise-level DDoS protection through complete Doc
 
 ### 🏢 Production Architecture Replicated
 ```
-[Client] → [Aurora Shield Gateway] → [Nginx Load Balancer] → [Protected Web App] 
-                      ↓
-            [Redis (Caching Layer)]
-                      ↓
-[Prometheus] ← [Aurora Shield Gateway] → [Elasticsearch]
-                      ↓
-            [Grafana]   [Kibana]
+                              [Attack Orchestrator]
+                                       |
+                                       v
+      [HTTP Flood]   [Brute Force]   [Normal Traffic]   [Swarm/Bots]
+               |            |               |               |
+               +------------+---------------+---------------+
+                            |
+                            v
+       <----------------- [Aurora Shield (Filter)] ----------------->
+       |                                    |                          |
+       |                                    |                          |
+ Malicious [BLOCKED]                        | Normal [ACCEPTED]        Malicious [BLOCKED]
+                                            |
+                                            |
+                                            v
+                             [Load Balancer (Port 8090)]
+                                       |
+                   +-------------------+-------------------+
+                   v                   v                   v
+              [CDN Node #1]       [CDN Node #2]       [CDN Node #3]
+              (Port 80)           (Port 8081)         (Port 8082)
 ```
 
 ### 🐳 Local Docker Environment
