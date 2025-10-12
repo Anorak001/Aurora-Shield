@@ -618,30 +618,6 @@
             transform: translateY(-1px);
         }
 
-        .reset-stats-button {
-            background: linear-gradient(135deg, #FF6B6B, #E55353);
-            border: none;
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.95rem;
-            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-        }
-
-        .reset-stats-button:hover {
-            background: linear-gradient(135deg, #E55353, #D63447);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
-        }
-
-        .reset-stats-button:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-        }
-
         .no-attacks {
             text-align: center;
             padding: 40px;
@@ -1348,17 +1324,6 @@
                         <div class="stat-value" id="active-mitigations">3</div>
                         <div class="stat-label">Active Mitigations</div>
                     </div>
-                </div>
-                
-                <!-- Statistics Control Panel -->
-                <div style="text-align: center; margin: 20px 0; padding: 15px; background: var(--dark-surface); border-radius: 8px; border: 1px solid var(--border);">
-                    <div style="margin-bottom: 10px; color: var(--muted); font-size: 14px;">
-                        📊 Statistics Management
-                    </div>
-                    <button class="reset-stats-button" onclick="resetLoadBalancerStats()" title="Reset all load balancer statistics to zero">
-                        🔄 Reset Statistics
-                    </button>
-                    <div id="reset-status" style="margin-top: 5px; font-size: 12px; color: var(--muted);"></div>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
@@ -3041,74 +3006,6 @@
                     btn.style.transform = '';
                 }, 300);
             }
-        }
-
-        function resetLoadBalancerStats() {
-            const statusDiv = document.getElementById('reset-status');
-            const btn = document.querySelector('.reset-stats-button');
-            
-            // Show loading state
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '🔄 Resetting...';
-                btn.style.opacity = '0.7';
-            }
-            
-            if (statusDiv) {
-                statusDiv.innerHTML = '⏳ Resetting statistics...';
-                statusDiv.style.color = '#FFD60A';
-            }
-            
-            fetch('/api/dashboard/reset-stats', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = '✅ Statistics reset successfully!';
-                        statusDiv.style.color = '#4FFF93';
-                    }
-                    
-                    // Refresh the dashboard stats
-                    setTimeout(() => {
-                        updateDashboardStats();
-                        if (statusDiv) {
-                            statusDiv.innerHTML = '';
-                        }
-                    }, 2000);
-                } else {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = '❌ Failed to reset statistics';
-                        statusDiv.style.color = '#FF6B6B';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error resetting stats:', error);
-                if (statusDiv) {
-                    statusDiv.innerHTML = '❌ Error: ' + error.message;
-                    statusDiv.style.color = '#FF6B6B';
-                }
-            })
-            .finally(() => {
-                // Restore button state
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '🔄 Reset Statistics';
-                    btn.style.opacity = '1';
-                }
-                
-                // Clear status after 5 seconds
-                setTimeout(() => {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = '';
-                    }
-                }, 5000);
-            });
         }
 
         document.addEventListener('DOMContentLoaded', function() {

@@ -395,6 +395,7 @@
                 <button class="btn btn-danger" onclick="stopAllBots()">⏹️ Stop All</button>
                 <button class="btn btn-danger" onclick="deleteAllBots()">🗑️ Delete All Bots</button>
                 <button class="btn btn-primary" onclick="createRandomBotsPrompt()">🤖 Create Random Bots</button>
+                <button class="btn btn-success" onclick="createLegitimateBot()">👤 Add Legitimate User</button>
                 <button class="btn btn-warning" onclick="toggleCreateForm()">⚙️ Custom Bot</button>
                 <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
                 <button class="btn btn-info" onclick="switchTab('analytics')">📊 Analytics</button>
@@ -745,6 +746,35 @@
             .then(data => {
                 if (data.success) {
                     refreshData();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function createLegitimateBot() {
+            // Create a legitimate normal traffic bot with optimal bypass settings
+            const legitimateConfig = {
+                rate: 0.3,  // Low rate - 0.3 requests per second
+                attack_duration: 300,  // 5 minutes
+                target_url: 'http://load-balancer:8090/index.html',  // Target load balancer to trigger protection
+                user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                payload_size: 0  // No payload for normal requests
+            };
+
+            fetch('/api/bots/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    attack_type: 'normal',
+                    config: legitimateConfig
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    refreshData();
+                    alert('✅ Legitimate user bot created! It will simulate normal browsing behavior and bypass all protection layers.');
                 } else {
                     alert('Error: ' + data.error);
                 }

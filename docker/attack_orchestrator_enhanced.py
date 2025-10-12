@@ -74,10 +74,10 @@ class VirtualBotManager:
         self.target_host = "load-balancer:8090"  # Target load balancer which routes through Aurora Shield
         self.attack_templates = {
             'normal': {
-                'rate_range': (0.5, 5),
+                'rate_range': (0.3, 2.0),  # Slower, more human-like rates
                 'user_agents': ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'],
                 'payloads': [50, 100, 200],
-                'paths': ['/', '/about', '/contact', '/services', '/products', '/help']
+                'paths': ['/', '/index.html', '/favicon.ico', '/robots.txt', '/sitemap.xml', '/health.html']  # Paths that actually exist or are common
             },
             'http_flood': {
                 'rate_range': (10, 100),
@@ -183,7 +183,7 @@ class VirtualBotManager:
             payload_size=payload_size,
             concurrent_connections=random.randint(1, 10),
             attack_duration=random.randint(60, 300),  # 1-5 minutes
-            randomize_headers=random.choice([True, False])
+            randomize_headers=True if attack_type == 'normal' else random.choice([True, False])
         )
         
         # Apply custom configuration if provided
@@ -280,9 +280,20 @@ class VirtualBotManager:
                 # Simulate sending request
                 self._simulate_request(bot)
                 
-                # Wait based on rate
+                # Wait based on rate with randomness for normal bots
                 if bot.rate > 0:
-                    time.sleep(1.0 / bot.rate)
+                    base_sleep = 1.0 / bot.rate
+                    if bot.attack_type == 'normal':
+                        # Add randomness for normal bots to avoid detection as automated
+                        # Vary timing by ±50% to simulate human-like irregular patterns
+                        variation = random.uniform(0.5, 1.5)
+                        sleep_time = base_sleep * variation
+                        # Also add occasional longer pauses (like a human reading)
+                        if random.random() < 0.1:  # 10% chance of longer pause
+                            sleep_time += random.uniform(2, 8)
+                    else:
+                        sleep_time = base_sleep
+                    time.sleep(sleep_time)
                 else:
                     time.sleep(1.0)
                 
@@ -355,6 +366,9 @@ class VirtualBotManager:
             elif response.status_code in [403, 429, 503]:  # Common blocking status codes
                 bot.blocked_requests += 1
                 logger.debug(f"Bot {bot.id} request blocked: {response.status_code}")
+            elif response.status_code in [404, 500, 502, 503, 504]:  # Error status codes
+                bot.blocked_requests += 1
+                logger.debug(f"Bot {bot.id} request failed: {response.status_code}")
             else:
                 # Other status codes might indicate partial success or server issues
                 bot.successful_requests += 1

@@ -57,8 +57,8 @@ class SinkholeManager:
         
         # Sinkhole configuration
         self.config = {
-            'auto_sinkhole_threshold': 10,      # violations before auto-sinkhole
-            'auto_blackhole_threshold': 50,     # violations before auto-blackhole
+            'auto_sinkhole_threshold': 25,      # violations before auto-sinkhole (increased from 10)
+            'auto_blackhole_threshold': 75,     # violations before auto-blackhole (increased from 50)
             'quarantine_duration': 3600,        # 1 hour default quarantine
             'reputation_decay_rate': 0.1,       # reputation improvement over time
             'honeypot_delay_min': 1.0,          # minimum response delay

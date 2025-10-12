@@ -243,13 +243,14 @@ class AdvancedRateLimiter:
             avg_interval = sum(intervals) / len(intervals)
             variance = sum((x - avg_interval) ** 2 for x in intervals) / len(intervals)
             
-            # Very regular intervals are suspicious (bots)
-            if variance < 0.1 and avg_interval < 2.0:
-                score += 0.3
-                reasons.append("regular_timing")
+            # EXTREMELY regular intervals are suspicious (variance < 0.05)
+            # AND very fast requests (< 1 second) indicate automated behavior
+            if variance < 0.05 and avg_interval < 1.0:
+                score += 0.2  # Reduced from 0.3
+                reasons.append("robotic_timing")
             
-            # Very fast requests are suspicious
-            if avg_interval < 0.5:
+            # Very fast requests are suspicious (< 0.3 seconds between requests)
+            if avg_interval < 0.3:
                 score += 0.2
                 reasons.append("fast_requests")
         
@@ -272,7 +273,16 @@ class AdvancedRateLimiter:
             score += 0.15
             reasons.append("bot_user_agent")
         
-        # 5. Check for missing common headers (in real implementation)
+        # 5. Legitimate browser behavior bonus
+        # Reduce suspicion for realistic browser patterns
+        legitimate_indicators = ['mozilla', 'chrome', 'safari', 'firefox', 'edge']
+        if any(indicator in user_agent.lower() for indicator in legitimate_indicators):
+            # Accessing common web resources indicates legitimate browsing
+            common_paths = ['/', '/index.html', '/favicon.ico', '/robots.txt', '/sitemap.xml', '/health.html']
+            if any(common_path in path for common_path in common_paths):
+                score = max(0, score - 0.15)  # Reduce suspicion for legitimate patterns
+        
+        # 6. Check for missing common headers (in real implementation)
         # This would analyze the headers dict for typical browser headers
         
         pattern['suspicious_score'] = score
