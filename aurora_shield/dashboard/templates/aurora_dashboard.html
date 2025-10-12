@@ -704,6 +704,16 @@
 
         .status-active { background-color: var(--success); box-shadow: 0 0 12px rgba(0,255,136,0.4); }
         .status-inactive { background-color: var(--danger); box-shadow: 0 0 12px rgba(255,71,87,0.4); }
+        .status-emergency { 
+            background-color: #ff6b6b; 
+            box-shadow: 0 0 15px rgba(255,107,107,0.8); 
+            animation: emergency-pulse 2s infinite;
+        }
+
+        @keyframes emergency-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
         .status-warning { background-color: var(--warning); box-shadow: 0 0 12px rgba(255,165,2,0.4); }
 
         /* Mitigation controls */
@@ -1281,9 +1291,14 @@
                             <span class="status-indicator status-inactive"></span>
                         </div>
                         <div class="mitigation-description">
-                            Activate maximum protection during severe attacks
+                            <strong>CRITICAL SECURITY PROTOCOL:</strong><br>
+                            Initiates immediate infrastructure shutdown for emergency maintenance during severe multi-vector attacks. 
+                            All non-essential services (CDN nodes, load balancers, demo applications) will be gracefully terminated 
+                            to prevent system compromise and data loss. Only the Aurora Shield core dashboard remains operational 
+                            for incident monitoring and recovery coordination.<br><br>
+                            <span style="color: #ff6b6b; font-weight: bold;">⚠️ WARNING:</span> This action will cause temporary service unavailability but is necessary to preserve system integrity during critical security incidents.
                         </div>
-                        <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate</button>
+                        <button class="btn btn-danger" onclick="toggleEmergencyMode()">🔴 Activate Emergency Shutdown</button>
                     </div>
                 </div>
             </div>
@@ -2002,8 +2017,137 @@
         }
 
         function toggleEmergencyMode() {
-            if (confirm('⚠️ Are you sure you want to activate Emergency Mode? This will apply maximum protection but may affect legitimate users.')) {
-                alert('🚨 Emergency Mode activated! All non-essential traffic will be filtered.');
+            if (confirm('🚨 CRITICAL SECURITY ALERT!\n\n⚠️  Emergency infrastructure shutdown will be initiated immediately.\n\n🔴 This will terminate Docker containers:\n   • Load balancer containers\n   • CDN distribution nodes\n   • Demo application instances\n   • Attack orchestrator services\n   • Database and monitoring services\n\n✅ Aurora Shield dashboard will remain operational for recovery.\n\n⏱️  Estimated downtime: 2-5 minutes for graceful shutdown\n📊 System recovery requires manual restart after threat assessment\n\n⚠️  WARNING: This will actually stop Docker containers!\n\nContinue with emergency shutdown protocol?')) {
+                
+                // Show loading overlay
+                showEmergencyShutdownProgress();
+                
+                // Call the real emergency shutdown API
+                fetch('/api/emergency/shutdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        reason: 'Emergency shutdown initiated from dashboard by user'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove progress overlay
+                    const overlay = document.getElementById('emergency-overlay');
+                    if (overlay) {
+                        document.body.removeChild(overlay);
+                    }
+                    
+                    if (data.success) {
+                        const results = data.results || [];
+                        const stopped = results.filter(r => r.status === 'stopped');
+                        const failed = results.filter(r => r.status === 'error');
+                        
+                        let message = `🚨 EMERGENCY SHUTDOWN COMPLETED!\n\n`;
+                        message += `✅ Successfully stopped: ${stopped.length} containers\n`;
+                        if (failed.length > 0) {
+                            message += `❌ Failed to stop: ${failed.length} containers\n`;
+                        }
+                        message += `\n📋 Containers stopped:\n`;
+                        
+                        stopped.forEach(container => {
+                            message += `   • ${container.name} (${container.id})\n`;
+                        });
+                        
+                        if (failed.length > 0) {
+                            message += `\n❌ Failed containers:\n`;
+                            failed.forEach(container => {
+                                message += `   • ${container.name}: ${container.error}\n`;
+                            });
+                        }
+                        
+                        message += `\n🛡️  Aurora Shield dashboard remains active\n`;
+                        message += `� System status: EMERGENCY MODE\n`;
+                        message += `⚠️  Manual container restart required to restore services\n`;
+                        message += `⏰ Shutdown completed at: ${new Date(data.shutdown_time).toLocaleString()}`;
+                        
+                        alert(message);
+                        
+                        // Update UI to show emergency state
+                        updateEmergencyModeUI(true);
+                    } else {
+                        alert(`🚨 EMERGENCY SHUTDOWN FAILED!\n\n❌ Error: ${data.error}\n\n${data.message || ''}\n\nPlease contact system administrator immediately.`);
+                    }
+                })
+                .catch(error => {
+                    // Remove progress overlay
+                    const overlay = document.getElementById('emergency-overlay');
+                    if (overlay) {
+                        document.body.removeChild(overlay);
+                    }
+                    
+                    console.error('Emergency shutdown error:', error);
+                    alert(`🚨 EMERGENCY SHUTDOWN FAILED!\n\n❌ Network Error: ${error.message}\n\nUnable to communicate with emergency shutdown API.\nPlease contact system administrator immediately.`);
+                });
+            }
+        }
+
+        function showEmergencyShutdownProgress() {
+            // Create overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'emergency-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); z-index: 10000;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                color: white; font-family: monospace;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="text-align: center; max-width: 600px; padding: 40px;">
+                    <h2 style="color: #ff6b6b; margin-bottom: 30px;">🚨 EMERGENCY DOCKER SHUTDOWN IN PROGRESS</h2>
+                    <div id="shutdown-progress" style="text-align: left; background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #333;">
+                        <div class="progress-line">⏱️  Connecting to Docker daemon...</div>
+                        <div class="progress-line">🔄 Scanning for running containers...</div>
+                        <div class="progress-line">� Initiating graceful shutdown sequence...</div>
+                        <div class="progress-line">� Sending SIGTERM to all containers...</div>
+                        <div class="progress-line">⏰ Waiting for graceful termination...</div>
+                        <div class="progress-line">💀 Force killing unresponsive containers...</div>
+                    </div>
+                    <div style="margin-top: 20px; color: #ffd700;">
+                        ⚠️ REAL DOCKER SHUTDOWN IN PROGRESS - DO NOT CLOSE
+                    </div>
+                    <div style="margin-top: 10px; color: #ff6b6b; font-size: 14px;">
+                        This will actually stop your Docker containers!
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            // Animate progress
+            const progressLines = overlay.querySelectorAll('.progress-line');
+            progressLines.forEach((line, index) => {
+                setTimeout(() => {
+                    line.style.color = '#4ade80';
+                    line.innerHTML = line.innerHTML.replace('🔄', '✅').replace('⏱️', '✅').replace('📡', '✅').replace('�', '✅');
+                }, (index + 1) * 600);
+            });
+            
+            // Remove overlay after sequence
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 4000);
+        }
+
+        function updateEmergencyModeUI(active) {
+            const button = document.querySelector('[onclick="toggleEmergencyMode()"]');
+            const indicator = button.parentElement.querySelector('.status-indicator');
+            
+            if (active) {
+                button.textContent = '🟢 System in Maintenance Mode';
+                button.className = 'btn btn-warning';
+                button.onclick = () => alert('🛡️ System is in emergency maintenance mode.\n\n📞 Contact system administrator for service restoration.\n📧 Emergency contact: security@aurorashield.com\n🔧 Manual intervention required to restart services.');
+                indicator.className = 'status-indicator status-emergency';
+                indicator.style.background = '#ff6b6b';
+                indicator.style.boxShadow = '0 0 10px #ff6b6b';
             }
         }
 

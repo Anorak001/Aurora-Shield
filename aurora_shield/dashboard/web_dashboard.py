@@ -12,6 +12,8 @@ import random
 import requests
 import requests
 from datetime import datetime
+import docker
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -740,6 +742,124 @@ class WebDashboard:
             except Exception as e:
                 logger.error(f"Error updating config: {e}")
                 return jsonify({'error': 'Failed to update configuration'}), 500
+
+        @self.app.route('/api/emergency/shutdown', methods=['POST'])
+        def emergency_shutdown():
+            """Emergency shutdown - stops all Docker containers for system protection."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                shutdown_data = request.get_json() or {}
+                reason = shutdown_data.get('reason', 'Emergency shutdown initiated from dashboard')
+                
+                logger.critical(f"EMERGENCY SHUTDOWN initiated by {session.get('name', 'unknown')}: {reason}")
+                
+                # Use subprocess to call docker commands directly
+                try:
+                    # Get list of running containers
+                    result = subprocess.run(['docker', 'ps', '--format', '{{.Names}}:{{.ID}}'], 
+                                          capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode != 0:
+                        return jsonify({
+                            'success': False,
+                            'error': f'Failed to list containers: {result.stderr}',
+                            'message': 'Could not access Docker daemon'
+                        }), 500
+                    
+                    containers_info = []
+                    if result.stdout.strip():
+                        for line in result.stdout.strip().split('\n'):
+                            if ':' in line:
+                                name, container_id = line.split(':', 1)
+                                # Skip the Aurora Shield container itself to keep dashboard operational
+                                if 'aurora-shield' not in name.lower():
+                                    containers_info.append({'name': name, 'id': container_id})
+                    
+                    if not containers_info:
+                        return jsonify({
+                            'success': True,
+                            'message': 'No running containers found',
+                            'containers_stopped': 0,
+                            'results': []
+                        })
+                    
+                    shutdown_results = []
+                    
+                    # Stop each container
+                    for container in containers_info:
+                        try:
+                            # Stop container with 10 second timeout
+                            stop_result = subprocess.run(['docker', 'stop', container['id']], 
+                                                       capture_output=True, text=True, timeout=30)
+                            
+                            if stop_result.returncode == 0:
+                                shutdown_results.append({
+                                    'name': container['name'],
+                                    'id': container['id'],
+                                    'status': 'stopped',
+                                    'error': None
+                                })
+                                logger.info(f"Emergency shutdown: Stopped container {container['name']} ({container['id']})")
+                            else:
+                                shutdown_results.append({
+                                    'name': container['name'],
+                                    'id': container['id'],
+                                    'status': 'error',
+                                    'error': stop_result.stderr.strip() or 'Failed to stop container'
+                                })
+                                logger.error(f"Emergency shutdown: Failed to stop container {container['name']}: {stop_result.stderr}")
+                            
+                        except subprocess.TimeoutExpired:
+                            shutdown_results.append({
+                                'name': container['name'],
+                                'id': container['id'],
+                                'status': 'error',
+                                'error': 'Timeout while stopping container'
+                            })
+                            logger.error(f"Emergency shutdown: Timeout stopping container {container['name']}")
+                        
+                        except Exception as e:
+                            shutdown_results.append({
+                                'name': container['name'],
+                                'id': container['id'],
+                                'status': 'error',
+                                'error': str(e)
+                            })
+                            logger.error(f"Emergency shutdown: Error stopping container {container['name']}: {e}")
+                    
+                    stopped_count = len([r for r in shutdown_results if r['status'] == 'stopped'])
+                    error_count = len([r for r in shutdown_results if r['status'] == 'error'])
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f'Emergency shutdown completed. Stopped {stopped_count} containers, {error_count} errors.',
+                        'containers_stopped': stopped_count,
+                        'containers_failed': error_count,
+                        'results': shutdown_results,
+                        'shutdown_time': datetime.now().isoformat(),
+                        'reason': reason
+                    })
+                    
+                except subprocess.TimeoutExpired:
+                    logger.error("Emergency shutdown: Timeout while executing docker commands")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Timeout while executing emergency shutdown',
+                        'message': 'Docker commands took too long to execute'
+                    }), 500
+                    
+            except Exception as e:
+                logger.error(f"Error during emergency shutdown: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'message': 'Emergency shutdown failed'
+                }), 500
 
         @self.app.route('/health')
         def health_check():

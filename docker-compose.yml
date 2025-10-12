@@ -13,6 +13,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - aurora-net
     restart: unless-stopped
