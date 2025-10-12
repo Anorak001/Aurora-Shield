@@ -2175,7 +2175,88 @@
         }
 
         function exportLogs() {
-            alert('💾 Log export functionality would be implemented here');
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '⏳ Exporting...';
+            btn.disabled = true;
+            
+            // Call the export API
+            fetch('/api/export/logs')
+                .then(response => {
+                    if (response.ok) {
+                        // Get filename from response headers or create default
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'aurora_shield_logs.json';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename=([^;]+)/);
+                            if (filenameMatch) {
+                                filename = filenameMatch[1];
+                            }
+                        }
+                        
+                        // Create download
+                        return response.blob().then(blob => {
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            
+                            // Show success message
+                            showLogExportStatus('✅ Logs exported successfully!', 'success');
+                        });
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Export failed');
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Log export error:', error);
+                    showLogExportStatus(`❌ Export failed: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    // Restore button state
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                });
+        }
+        
+        function showLogExportStatus(message, type) {
+            // Create or update status message
+            let statusDiv = document.getElementById('log-export-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'log-export-status';
+                statusDiv.style.cssText = `
+                    position: fixed; top: 80px; right: 20px; z-index: 1000;
+                    padding: 12px 20px; border-radius: 8px; font-weight: 500;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 300px;
+                    backdrop-filter: blur(10px);
+                `;
+                document.body.appendChild(statusDiv);
+            }
+            
+            statusDiv.textContent = message;
+            
+            if (type === 'success') {
+                statusDiv.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                statusDiv.style.color = 'white';
+            } else {
+                statusDiv.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                statusDiv.style.color = 'white';
+            }
+            
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                if (statusDiv && statusDiv.parentNode) {
+                    statusDiv.parentNode.removeChild(statusDiv);
+                }
+            }, 4000);
         }
 
         function refreshAllData() {
