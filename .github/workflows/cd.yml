@@ -35,8 +35,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/aurora-shield:latest
-            ghcr.io/${{ github.repository_owner }}/aurora-shield:${{ github.sha }}
+            ghcr.io/anorak001/aurora-shield:latest
+            ghcr.io/anorak001/aurora-shield:${{ github.sha }}
 
       - name: Set output image
-        run: echo "image=ghcr.io/${{ github.repository_owner }}/aurora-shield:${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "image=ghcr.io/anorak001/aurora-shield:${{ github.sha }}" >> $GITHUB_OUTPUT
