@@ -326,6 +326,11 @@ def get_stats():
         'timestamp': datetime.now().isoformat()
     })
 
+@app.route('/')
+def index():
+    """Root route - redirect to dashboard."""
+    return redirect('/dashboard')
+
 @app.route('/dashboard')
 def enhanced_dashboard():
     """Enhanced load balancer dashboard with real-time monitoring."""
