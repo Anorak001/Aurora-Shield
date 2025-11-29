@@ -1,6 +1,7 @@
 """
 Default configuration for Aurora Shield.
 """
+import os
 
 DEFAULT_CONFIG = {
     'anomaly_detector': {
@@ -37,6 +38,6 @@ DEFAULT_CONFIG = {
     },
     'dashboard': {
         'host': '0.0.0.0',
-        'port': 8080,
+        'port': int(os.environ.get('PORT', 8080)),  # Render uses PORT env var
     }
 }

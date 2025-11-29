@@ -35,13 +35,14 @@ USER loadbalancer
 # Set environment variables
 ENV FLASK_ENV=production
 ENV PYTHONPATH=/app
+ENV PORT=8090
 
-# Expose port 8090
+# Expose port (Render will override with PORT env var)
 EXPOSE 8090
 
-# Health check
+# Health check - uses PORT env var
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8090/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8090}/health || exit 1
 
 # Start the load balancer
 CMD ["python", "app.py"]

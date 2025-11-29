@@ -22,17 +22,18 @@ COPY . .
 # Create logs directory
 RUN mkdir -p /app/logs
 
-# Expose the dashboard port
+# Expose the dashboard port (Render will override with PORT env var)
 EXPOSE 8080
 
-# Health check
+# Health check - uses PORT env var for Render compatibility
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/dashboard/stats || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV AURORA_ENV=docker
 ENV FLASK_ENV=production
+ENV PORT=8080
 
 # Create non-root user for security and add to docker group
 RUN useradd -m -u 1000 aurora && \

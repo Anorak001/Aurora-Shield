@@ -27,23 +27,29 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # CDN configuration with weights
+# Supports both Docker internal networking and external URLs (for Render deployment)
 CDN_SERVICES = {
     'primary': {
-        'url': 'http://demo-webapp:80',
+        'url': os.environ.get('CDN_PRIMARY_URL', 'http://demo-webapp:80'),
         'weight': 3,
         'status': 'active'
     },
     'secondary': {
-        'url': 'http://demo-webapp-cdn2:80', 
+        'url': os.environ.get('CDN_SECONDARY_URL', 'http://demo-webapp-cdn2:80'), 
         'weight': 2,
         'status': 'active'
     },
     'tertiary': {
-        'url': 'http://demo-webapp-cdn3:80',
+        'url': os.environ.get('CDN_TERTIARY_URL', 'http://demo-webapp-cdn3:80'),
         'weight': 1,
         'status': 'active'
     }
 }
+
+# Log CDN configuration at startup
+logger.info(f"CDN Configuration: primary={CDN_SERVICES['primary']['url']}, "
+            f"secondary={CDN_SERVICES['secondary']['url']}, "
+            f"tertiary={CDN_SERVICES['tertiary']['url']}")
 
 # Load balancer stats
 stats = {
@@ -1254,5 +1260,6 @@ def initialize_stats():
 if __name__ == '__main__':
     # Initialize stats on startup
     initialize_stats()
-    logger.info("Starting Aurora Shield Load Balancer on port 8090")
-    app.run(host='0.0.0.0', port=8090, debug=False)
+    port = int(os.environ.get('PORT', 8090))
+    logger.info(f"Starting Aurora Shield Load Balancer on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False)
