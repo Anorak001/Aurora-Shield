@@ -79,17 +79,21 @@ class IPReputation:
             violation_type (str): Type of violation
             severity (int): Severity score (1-100)
         """
+        old_score = self.reputation_scores[ip_address]
         self.reputation_scores[ip_address] = max(0, self.reputation_scores[ip_address] - severity)
+        new_score = self.reputation_scores[ip_address]
+        
+        logger.info(f"IP {ip_address} violation recorded: {violation_type} (severity: {severity}). Score: {old_score} -> {new_score}")
+        
         self.violation_history[ip_address].append({
             'type': violation_type,
             'severity': severity,
             'timestamp': time.time()
         })
         
-        # Auto-blacklist if score drops too low
-        if self.reputation_scores[ip_address] <= 10:
-            self.blacklist.add(ip_address)
-            logger.warning(f"IP {ip_address} auto-blacklisted due to low reputation")
+        # Let the sinkhole system handle auto-blacklisting based on violation patterns
+        # Don't auto-blacklist here - let the multi-layer protection system decide
+        # The sinkhole system will handle escalation based on violation history and patterns
     
     def record_good_behavior(self, ip_address, improvement=5):
         """

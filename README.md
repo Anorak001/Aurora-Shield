@@ -8,22 +8,34 @@ Aurora Shield demonstrates enterprise-level DDoS protection through complete Doc
 
 ### 🏢 Production Architecture Replicated
 ```
-[Client] → [Aurora Shield Gateway] → [Nginx Load Balancer] → [Protected Web App] 
-                      ↓
-            [Redis (Caching Layer)]
-                      ↓
-[Prometheus] ← [Aurora Shield Gateway] → [Elasticsearch]
-                      ↓
-            [Grafana]   [Kibana]
+                              [Attack Orchestrator]
+                                       |
+                                       v
+      [HTTP Flood]   [Brute Force]   [Normal Traffic]   [Swarm/Bots]
+               |            |               |               |
+               +------------+---------------+---------------+
+                            |
+                            v
+       <----------------- [Aurora Shield (Filter)] ----------------->
+       |                                    |                          |
+       |                                    |                          |
+ Malicious [BLOCKED]                        | Normal [ACCEPTED]        Malicious [BLOCKED]
+                                            |
+                                            |
+                                            v
+                             [Load Balancer (Port 8090)]
+                                       |
+                   +-------------------+-------------------+
+                   v                   v                   v
+              [CDN Node #1]       [CDN Node #2]       [CDN Node #3]
+              (Port 80)           (Port 8081)         (Port 8082)
 ```
 
 ### 🐳 Local Docker Environment
 - **Aurora Shield Gateway** (Port 8080) - Main protection engine
-- **Protected Web App** (Port 80) - Application being secured  
+- **Protected Web App** (Port 80,8081,8082) - Application being secured  
 - **Load Balancer** (Port 8090) - Traffic distribution
-- **ELK Stack** (Ports 9200, 5601) - Log analysis
-- **Grafana/Prometheus** (Ports 3000, 9090) - Metrics monitoring
-- **Attack Simulator** - Realistic threat testing
+- **Attack Simulator**(Port 5000) - Realistic threat testing
 
 ## ✨ Features
 
@@ -65,7 +77,7 @@ Aurora Shield demonstrates enterprise-level DDoS protection through complete Doc
 ### Prerequisites
 - Docker Desktop installed
 - 8GB+ RAM available  
-- Ports 80, 3000, 5601, 8080, 8090, 9090, 9200 free
+- Ports 80, 5000, 8080, 8090, free
 
 ### Start Complete Environment
 ```bash
@@ -77,7 +89,7 @@ cd Aurora-Shield
 docker-compose up -d
 
 # Access dashboard
-open http://localhost:8080
+open http://localhost:8080/dashboard
 # Login: admin/admin123
 ```
 
@@ -113,9 +125,6 @@ docker/
 |---------|---------|-----|-------------|
 | **Aurora Shield** | Main dashboard | http://localhost:8080 | admin/admin123 |
 | **Protected App** | Secured application | http://localhost:80 | - |
-| **Kibana** | Log analysis | http://localhost:5601 | - |  
-| **Grafana** | Metrics visualization | http://localhost:3000 | admin/admin |
-| **Prometheus** | Metrics collection | http://localhost:9090 | - |
 git clone https://github.com/Anorak001/Aurora-Shield.git
 cd Aurora-Shield
 
@@ -295,33 +304,6 @@ config = {
 
 shield = AuroraShieldManager(config)
 ```
-
-## 📈 Monitoring Integration
-
-### Elasticsearch/Kibana
-
-Import the Kibana dashboard:
-
-```bash
-# Import dashboard configuration
-curl -X POST "localhost:5601/api/saved_objects/_import" \
-  -H "kbn-xsrf: true" \
-  --form file=@dashboards/kibana_dashboard.json
-```
-
-### Prometheus/Grafana
-
-Import the Grafana dashboard:
-
-```bash
-# Import to Grafana
-curl -X POST http://localhost:3000/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -d @dashboards/grafana_dashboard.json
-```
-
-Metrics are available at: `http://localhost:5000/metrics`
-
 ## 🧪 Testing
 
 Aurora Shield includes attack simulation tools for testing:

@@ -1,0 +1,18 @@
+# Bot Agent Dockerfile
+FROM python:3.9-slim
+
+# Install required packages
+RUN pip install requests flask
+
+# Set working directory
+WORKDIR /app
+
+# Copy bot agent script
+COPY bot_agent.py /app/
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV AUTO_ATTACK=true
+
+# Default command
+CMD ["python", "bot_agent.py"]

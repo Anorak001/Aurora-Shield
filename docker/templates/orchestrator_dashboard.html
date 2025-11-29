@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield - Attack Orchestrator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h3 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            color: #ffd700;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 10px;
+        }
+
+        .fleet-status {
+            grid-column: 1 / -1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4ade80;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4757, #c44569);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .input-group label {
+            min-width: 120px;
+            font-weight: bold;
+        }
+
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 1em;
+        }
+
+        .bot-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .bot-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 4px solid #4ade80;
+        }
+
+        .bot-item.attacking {
+            border-left-color: #ff6b6b;
+            animation: pulse 2s infinite;
+        }
+
+        .bot-item.idle {
+            border-left-color: #ffd700;
+        }
+
+        .bot-item.offline {
+            border-left-color: #6c757d;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .bot-info {
+            flex: 1;
+        }
+
+        .bot-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .bot-details {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .bot-stats {
+            text-align: right;
+            font-size: 0.9em;
+        }
+
+        .attack-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .log-info {
+            background: rgba(0, 123, 255, 0.2);
+        }
+
+        .log-success {
+            background: rgba(40, 167, 69, 0.2);
+        }
+
+        .log-warning {
+            background: rgba(255, 193, 7, 0.2);
+        }
+
+        .log-error {
+            background: rgba(220, 53, 69, 0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active { background: #4ade80; }
+        .status-attacking { background: #ff6b6b; animation: pulse 1s infinite; }
+        .status-idle { background: #ffd700; }
+        .status-offline { background: #6c757d; }
+
+        .fleet-health {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .health-bar {
+            flex: 1;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b 0%, #ffd700 50%, #4ade80 100%);
+            transition: width 0.5s ease;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            opacity: 0.7;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .input-group label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Aurora Shield Attack Orchestrator</h1>
+        <p>Multi-Container Bot Fleet Management for Realistic DDoS Simulation</p>
+    </div>
+
+    <div class="dashboard">
+        <!-- Fleet Status Overview -->
+        <div class="panel fleet-status">
+            <h3>🤖 Fleet Status</h3>
+            
+            <div class="fleet-health">
+                <span><strong>Fleet Health:</strong></span>
+                <div class="health-bar">
+                    <div class="health-fill" id="healthFill" style="width: 0%"></div>
+                </div>
+                <span id="healthStatus">Unknown</span>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="activeBots">0</div>
+                    <div class="stat-label">Active Bots</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalBots">0</div>
+                    <div class="stat-label">Total Bots</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRequests">0</div>
+                    <div class="stat-label">Requests Sent</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="blockedRequests">0</div>
+                    <div class="stat-label">Requests Blocked</div>
+                </div>
+            </div>
+
+            <div class="bot-list" id="botList">
+                <div style="text-align: center; opacity: 0.6;">No bots deployed</div>
+            </div>
+        </div>
+
+        <!-- Bot Fleet Controls -->
+        <div class="panel">
+            <h3>🚀 Fleet Controls</h3>
+            
+            <div class="input-group">
+                <label>Bot Count:</label>
+                <input type="number" id="botCount" value="10" min="1" max="50">
+            </div>
+            
+            <div class="input-group">
+                <label>Attack Type:</label>
+                <select id="attackType">
+                    <option value="http_flood">HTTP Flood</option>
+                    <option value="slowloris">Slowloris</option>
+                    <option value="get_flood">GET Flood</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>Target URL:</label>
+                <input type="text" id="targetUrl" value="http://load-balancer:8090/cdn/">
+            </div>
+            
+            <div class="controls">
+                <button class="btn btn-primary" onclick="spawnBots()">Deploy Bot Fleet</button>
+                <button class="btn btn-danger" onclick="destroyFleet()">Destroy Fleet</button>
+            </div>
+        </div>
+
+        <!-- Attack Coordination -->
+        <div class="panel">
+            <h3>⚔️ Attack Coordination</h3>
+            
+            <div class="input-group">
+                <label>Duration (sec):</label>
+                <input type="number" id="attackDuration" value="30" min="5" max="300">
+            </div>
+            
+            <div class="input-group">
+                <label>Rate per Bot:</label>
+                <input type="number" id="ratePerBot" value="2.0" step="0.1" min="0.1" max="10">
+            </div>
+            
+            <div class="input-group">
+                <label>Target:</label>
+                <select id="attackTarget">
+                    <option value="load-balancer">Load Balancer</option>
+                    <option value="aurora-shield">Aurora Shield</option>
+                    <option value="direct-cdn">Direct CDN</option>
+                </select>
+            </div>
+            
+            <div class="controls">
+                <button class="btn btn-primary" onclick="coordinateAttack()">🎯 Launch Coordinated Attack</button>
+                <button class="btn btn-secondary" onclick="stopAttack()">🛑 Stop Attack</button>
+            </div>
+        </div>
+
+        <!-- Real-time Logs -->
+        <div class="panel">
+            <h3>📊 Attack Logs</h3>
+            <div class="attack-log" id="attackLog">
+                <div class="log-entry log-info">Orchestrator ready - awaiting commands...</div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="clearLogs()">Clear Logs</button>
+                <button class="btn btn-secondary" onclick="exportLogs()">Export Logs</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="timestamp" id="lastUpdate">
+        Last Update: Never
+    </div>
+
+    <script>
+        // Global state
+        let fleetData = {};
+        let isAttacking = false;
+        let logEntries = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            updateFleetStatus();
+            setInterval(updateFleetStatus, 2000); // Update every 2 seconds
+            addLog('info', '🎯 Attack Orchestrator Dashboard initialized');
+        });
+
+        // Fleet management functions
+        async function spawnBots() {
+            const count = parseInt(document.getElementById('botCount').value);
+            const attackType = document.getElementById('attackType').value;
+            const targetUrl = document.getElementById('targetUrl').value;
+
+            if (count < 1 || count > 50) {
+                addLog('error', '❌ Invalid bot count (1-50 allowed)');
+                return;
+            }
+
+            addLog('info', `🚀 Spawning ${count} bots with ${attackType} configuration...`);
+
+            try {
+                const response = await fetch('/api/fleet/spawn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        count: count,
+                        attack_type: attackType,
+                        target_url: targetUrl
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `✅ Successfully spawned ${result.spawned_count}/${count} bots`);
+                    if (result.failed_count > 0) {
+                        addLog('warning', `⚠️ ${result.failed_count} bots failed to spawn`);
+                    }
+                } else {
+                    addLog('error', `❌ Fleet spawn failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function destroyFleet() {
+            if (!confirm('Are you sure you want to destroy all bots?')) return;
+
+            addLog('warning', '💥 Destroying entire bot fleet...');
+
+            try {
+                const response = await fetch('/api/fleet/destroy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bots: 'all' })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `💥 Destroyed ${result.destroyed_count} bots`);
+                    if (result.failed_count > 0) {
+                        addLog('warning', `⚠️ ${result.failed_count} bots failed to destroy`);
+                    }
+                } else {
+                    addLog('error', `❌ Fleet destruction failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function coordinateAttack() {
+            const duration = parseInt(document.getElementById('attackDuration').value);
+            const ratePerBot = parseFloat(document.getElementById('ratePerBot').value);
+            const attackType = document.getElementById('attackType').value;
+            const target = document.getElementById('attackTarget').value;
+
+            if (fleetData.active_bots === 0) {
+                addLog('error', '❌ No active bots available for attack');
+                return;
+            }
+
+            isAttacking = true;
+            addLog('info', `⚔️ Coordinating ${attackType} attack: ${fleetData.active_bots} bots × ${ratePerBot} rps for ${duration}s`);
+
+            try {
+                const response = await fetch('/api/fleet/attack', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attack_type: attackType,
+                        duration: duration,
+                        rate_per_bot: ratePerBot,
+                        target: target
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `🎯 Attack launched! Expected RPS: ${result.expected_rps}`);
+                    addLog('info', `📊 Attack ID: ${result.attack_id}`);
+                    
+                    // Auto-stop indicator after duration
+                    setTimeout(() => {
+                        isAttacking = false;
+                        addLog('info', '🛑 Coordinated attack completed');
+                    }, duration * 1000);
+                } else {
+                    isAttacking = false;
+                    addLog('error', `❌ Attack coordination failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                isAttacking = false;
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function stopAttack() {
+            isAttacking = false;
+            addLog('warning', '🛑 Emergency attack stop requested');
+            // In a real implementation, this would send stop commands to all bots
+        }
+
+        async function updateFleetStatus() {
+            try {
+                const response = await fetch('/api/fleet/status');
+                const data = await response.json();
+                
+                fleetData = data;
+                updateUI(data);
+                
+            } catch (error) {
+                addLog('error', `❌ Failed to update fleet status: ${error.message}`);
+            }
+        }
+
+        function updateUI(data) {
+            // Update statistics
+            document.getElementById('activeBots').textContent = data.active_bots || 0;
+            document.getElementById('totalBots').textContent = data.total_bots || 0;
+            document.getElementById('totalRequests').textContent = data.stats?.requests_sent || 0;
+            document.getElementById('blockedRequests').textContent = data.stats?.requests_blocked || 0;
+
+            // Update fleet health
+            const health = data.fleet_health || { health_score: 0, status: 'unknown' };
+            const healthFill = document.getElementById('healthFill');
+            const healthStatus = document.getElementById('healthStatus');
+            
+            healthFill.style.width = `${health.health_score}%`;
+            healthStatus.textContent = `${health.health_score}% (${health.status})`;
+
+            // Update bot list
+            updateBotList(data.bots || {});
+
+            // Update timestamp
+            document.getElementById('lastUpdate').textContent = 
+                `Last Update: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateBotList(bots) {
+            const botList = document.getElementById('botList');
+            
+            if (Object.keys(bots).length === 0) {
+                botList.innerHTML = '<div style="text-align: center; opacity: 0.6;">No bots deployed</div>';
+                return;
+            }
+
+            let html = '';
+            for (const [botId, bot] of Object.entries(bots)) {
+                const status = bot.status || 'unknown';
+                const statusClass = status === 'attacking' ? 'attacking' : 
+                                  status === 'active' ? 'idle' : 'offline';
+                
+                html += `
+                    <div class="bot-item ${statusClass}">
+                        <div class="bot-info">
+                            <div class="bot-name">
+                                <span class="status-indicator status-${status.replace('active', 'idle')}"></span>
+                                ${bot.container_name || botId}
+                            </div>
+                            <div class="bot-details">
+                                IP: ${bot.ip || 'Unknown'} | Type: ${bot.attack_type || 'Unknown'}
+                            </div>
+                        </div>
+                        <div class="bot-stats">
+                            <div>Sent: ${bot.requests_sent || 0}</div>
+                            <div>Success: ${bot.requests_successful || 0}</div>
+                            <div>Blocked: ${bot.requests_blocked || 0}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            botList.innerHTML = html;
+        }
+
+        function addLog(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                type: type,
+                message: message,
+                timestamp: timestamp
+            };
+            
+            logEntries.push(logEntry);
+            
+            // Keep only last 100 entries
+            if (logEntries.length > 100) {
+                logEntries.shift();
+            }
+            
+            // Update log display
+            const logContainer = document.getElementById('attackLog');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry log-${type}`;
+            logDiv.textContent = `[${timestamp}] ${message}`;
+            
+            logContainer.appendChild(logDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLogs() {
+            logEntries = [];
+            document.getElementById('attackLog').innerHTML = 
+                '<div class="log-entry log-info">Logs cleared</div>';
+        }
+
+        function exportLogs() {
+            const logText = logEntries.map(entry => 
+                `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `orchestrator-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault();
+                        spawnBots();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        destroyFleet();
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        coordinateAttack();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

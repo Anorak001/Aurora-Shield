@@ -1,10 +1,16 @@
 @echo off
 REM Aurora Shield Service Dashboard Launcher
 
-echo 🌐 Starting Aurora Shield Service Dashboard...
+echo 🛡️ Starting Aurora Shield Service Dashboard...
 echo.
-echo This will start a web dashboard at http://localhost:5000
+echo This will start the Aurora Shield main dashboard at http://localhost:5000
 echo You can monitor and manage all Aurora Shield services from there.
+echo.
+echo ✨ New Features in Optimized Version:
+echo    - Sinkhole/Blackhole protection integrated
+echo    - Virtual Attack Orchestrator with multi-subnet bots
+echo    - Streamlined 4-service architecture
+echo    - Real-time attack monitoring and mitigation
 echo.
 echo Press Ctrl+C to stop the dashboard
 echo.
@@ -28,6 +34,10 @@ REM Start the dashboard
 echo.
 echo 🚀 Starting Service Dashboard...
 echo Open your browser to: http://localhost:5000
+echo.
+echo Additional Access Points:
+echo    Aurora Shield Dashboard: http://localhost:8080
+echo    Virtual Attack Orchestrator: http://localhost:5000 (if running via Docker)
 echo.
 python service_dashboard.py
 

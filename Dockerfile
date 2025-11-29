@@ -4,9 +4,10 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Docker CLI
 RUN apt-get update && apt-get install -y \
     curl \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -21,21 +22,27 @@ COPY . .
 # Create logs directory
 RUN mkdir -p /app/logs
 
-# Expose the dashboard port
+# Expose the dashboard port (Render will override with PORT env var)
 EXPOSE 8080
 
-# Health check
+# Health check - uses PORT env var for Render compatibility
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/dashboard/stats || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV AURORA_ENV=docker
 ENV FLASK_ENV=production
+ENV PORT=8080
 
-# Create non-root user for security
-RUN useradd -m -u 1000 aurora && chown -R aurora:aurora /app
-USER aurora
+# Create non-root user for security and add to docker group
+RUN useradd -m -u 1000 aurora && \
+    groupadd -f docker && \
+    usermod -aG docker aurora && \
+    chown -R aurora:aurora /app
+
+# Don't switch to aurora user yet - stay as root for Docker access
+# USER aurora
 
 # Start the application
 CMD ["python", "main.py"]
