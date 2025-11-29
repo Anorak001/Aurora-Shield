@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield - Sinkhole Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c1810 0%, #8b4513 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 69, 19, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h3 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            color: #deb887;
+            border-bottom: 2px solid #deb887;
+            padding-bottom: 10px;
+        }
+
+        .overview {
+            grid-column: 1 / -1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(139, 69, 19, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(139, 69, 19, 0.3);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-value.sinkhole { color: #deb887; }
+        .stat-value.blackhole { color: #8b0000; }
+        .stat-value.quarantine { color: #ffa500; }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .input-group label {
+            min-width: 100px;
+            font-weight: bold;
+            color: #deb887;
+        }
+
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-sinkhole {
+            background: linear-gradient(45deg, #deb887, #d2691e);
+            color: #2c1810;
+        }
+
+        .btn-blackhole {
+            background: linear-gradient(45deg, #8b0000, #4b0000);
+            color: white;
+        }
+
+        .btn-quarantine {
+            background: linear-gradient(45deg, #ffa500, #ff8c00);
+            color: #2c1810;
+        }
+
+        .btn-info {
+            background: linear-gradient(45deg, #4682b4, #1e90ff);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .threat-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .threat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(139, 69, 19, 0.1);
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .threat-item.sinkhole { border-left-color: #deb887; }
+        .threat-item.blackhole { border-left-color: #8b0000; }
+        .threat-item.quarantine { border-left-color: #ffa500; }
+
+        .threat-info {
+            flex: 1;
+        }
+
+        .threat-target {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .threat-details {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .threat-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
+        .violators-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .violator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 6px;
+            background: rgba(139, 69, 19, 0.1);
+            border-radius: 5px;
+        }
+
+        .violator-info {
+            flex: 1;
+        }
+
+        .violator-ip {
+            font-weight: bold;
+            color: #deb887;
+        }
+
+        .violator-stats {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .honeypot-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .honeypot-card {
+            background: rgba(139, 69, 19, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .log-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px;
+        }
+
+        .log-info { color: #87ceeb; }
+        .log-success { color: #90ee90; }
+        .log-warning { color: #ffa500; }
+        .log-error { color: #ff6b6b; }
+
+        .timestamp {
+            font-size: 0.8em;
+            opacity: 0.7;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🕳️ Aurora Shield - Sinkhole Management</h1>
+        <p>Advanced Threat Isolation & Traffic Redirection System</p>
+    </div>
+
+    <div class="dashboard">
+        <!-- System Overview -->
+        <div class="panel overview">
+            <h3>🎯 System Overview</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value sinkhole" id="sinkholedIPs">0</div>
+                    <div class="stat-label">Sinkholed IPs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value blackhole" id="blackholedIPs">0</div>
+                    <div class="stat-label">Blackholed IPs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value quarantine" id="quarantinedIPs">0</div>
+                    <div class="stat-label">Quarantined IPs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value sinkhole" id="honeypotInteractions">0</div>
+                    <div class="stat-label">Honeypot Interactions</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Controls -->
+        <div class="panel">
+            <h3>🎛️ Manual Controls</h3>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <div class="input-group">
+                        <label>Target:</label>
+                        <input type="text" id="manualTarget" placeholder="IP, subnet, or fingerprint">
+                    </div>
+                    <div class="input-group">
+                        <label>Type:</label>
+                        <select id="manualType">
+                            <option value="ip">IP Address</option>
+                            <option value="subnet">Subnet</option>
+                            <option value="fingerprint">Fingerprint</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Reason:</label>
+                        <input type="text" id="manualReason" placeholder="Reason for action">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <button class="btn btn-sinkhole" onclick="addToSinkhole()">Add to Sinkhole</button>
+                    <button class="btn btn-blackhole" onclick="addToBlackhole()">Add to Blackhole</button>
+                </div>
+            </div>
+
+            <div class="controls">
+                <h4 style="color: #deb887; margin-bottom: 10px;">Quarantine Controls</h4>
+                <div class="control-group">
+                    <div class="input-group">
+                        <label>IP:</label>
+                        <input type="text" id="quarantineIP" placeholder="IP address">
+                    </div>
+                    <div class="input-group">
+                        <label>Duration:</label>
+                        <select id="quarantineDuration">
+                            <option value="300">5 minutes</option>
+                            <option value="900">15 minutes</option>
+                            <option value="1800">30 minutes</option>
+                            <option value="3600" selected>1 hour</option>
+                            <option value="7200">2 hours</option>
+                            <option value="86400">24 hours</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-quarantine" onclick="addToQuarantine()">Quarantine IP</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Threats -->
+        <div class="panel">
+            <h3>🚨 Active Threats</h3>
+            <div class="threat-list" id="threatList">
+                <div style="text-align: center; opacity: 0.6;">Loading threat data...</div>
+            </div>
+        </div>
+
+        <!-- Top Violators -->
+        <div class="panel">
+            <h3>👥 Top Violators</h3>
+            <div class="violators-list" id="violatorsList">
+                <div style="text-align: center; opacity: 0.6;">Loading violator data...</div>
+            </div>
+        </div>
+
+        <!-- Honeypot Statistics -->
+        <div class="panel">
+            <h3>🍯 Honeypot Statistics</h3>
+            <div class="honeypot-stats" id="honeypotStats">
+                <div class="honeypot-card">
+                    <div style="font-size: 1.5em; font-weight: bold;" id="webResponses">0</div>
+                    <div style="font-size: 0.9em;">Web Responses</div>
+                </div>
+                <div class="honeypot-card">
+                    <div style="font-size: 1.5em; font-weight: bold;" id="apiResponses">0</div>
+                    <div style="font-size: 0.9em;">API Responses</div>
+                </div>
+                <div class="honeypot-card">
+                    <div style="font-size: 1.5em; font-weight: bold;" id="redirectLoops">0</div>
+                    <div style="font-size: 0.9em;">Redirect Loops</div>
+                </div>
+                <div class="honeypot-card">
+                    <div style="font-size: 1.5em; font-weight: bold;" id="dataCollected">0 KB</div>
+                    <div style="font-size: 0.9em;">Data Collected</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Log -->
+        <div class="panel">
+            <h3>📋 Action Log</h3>
+            <div class="log-panel" id="actionLog">
+                <div class="log-entry log-info">Sinkhole management system initialized</div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-info" onclick="exportThreatIntel()">Export Threat Intelligence</button>
+                <button class="btn btn-info" onclick="clearLog()">Clear Log</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="timestamp" id="lastUpdate">
+        Last Update: Never
+    </div>
+
+    <script>
+        // Global state
+        let threatData = {};
+        let violatorsData = {};
+        let logEntries = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDashboard();
+            setInterval(updateDashboard, 3000); // Update every 3 seconds
+            addLog('info', '🕳️ Sinkhole Management Dashboard initialized');
+        });
+
+        async function updateDashboard() {
+            try {
+                // Get status data
+                const response = await fetch('/api/sinkhole/status');
+                const result = await response.json();
+
+                if (result.success) {
+                    updateOverview(result.data);
+                    updateThreatList(result.data);
+                }
+
+                // Get violators data
+                const violatorsResponse = await fetch('/api/stats/violations');
+                const violatorsResult = await violatorsResponse.json();
+
+                if (violatorsResult.success) {
+                    updateViolatorsList(violatorsResult.data);
+                }
+
+                // Get honeypot data
+                const honeypotResponse = await fetch('/api/honeypot/responses');
+                const honeypotResult = await honeypotResponse.json();
+
+                if (honeypotResult.success) {
+                    updateHoneypotStats(honeypotResult.data);
+                }
+
+                document.getElementById('lastUpdate').textContent = 
+                    `Last Update: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                addLog('error', `❌ Dashboard update failed: ${error.message}`);
+            }
+        }
+
+        function updateOverview(data) {
+            const stats = data.statistics.counts;
+            
+            document.getElementById('sinkholedIPs').textContent = stats.sinkholed_ips || 0;
+            document.getElementById('blackholedIPs').textContent = stats.blackholed_ips || 0;
+            document.getElementById('quarantinedIPs').textContent = stats.quarantined_ips || 0;
+            document.getElementById('honeypotInteractions').textContent = 
+                data.statistics.stats.honeypot_interactions || 0;
+        }
+
+        function updateThreatList(data) {
+            // This would be populated with actual threat data
+            const threatList = document.getElementById('threatList');
+            
+            let html = '';
+            
+            // Show some example threat entries (in real implementation, this would come from API)
+            const threats = [
+                { type: 'blackhole', target: '192.168.1.100', reason: 'Repeated DDoS attempts', actions: ['Remove'] },
+                { type: 'sinkhole', target: '10.0.1.0/24', reason: 'Suspicious subnet activity', actions: ['Upgrade to Blackhole', 'Remove'] },
+                { type: 'quarantine', target: '172.16.1.50', reason: 'Rate limit violations', actions: ['Extend', 'Release'] }
+            ];
+
+            for (const threat of threats) {
+                html += `
+                    <div class="threat-item ${threat.type}">
+                        <div class="threat-info">
+                            <div class="threat-target">${threat.target}</div>
+                            <div class="threat-details">${threat.reason}</div>
+                        </div>
+                        <div class="threat-actions">
+                            ${threat.actions.map(action => 
+                                `<button class="btn btn-small btn-info">${action}</button>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (html === '') {
+                html = '<div style="text-align: center; opacity: 0.6;">No active threats</div>';
+            }
+
+            threatList.innerHTML = html;
+        }
+
+        function updateViolatorsList(data) {
+            const violatorsList = document.getElementById('violatorsList');
+            
+            let html = '';
+            
+            for (const [ip, info] of Object.entries(data.top_violators || {})) {
+                html += `
+                    <div class="violator-item">
+                        <div class="violator-info">
+                            <div class="violator-ip">${ip}</div>
+                            <div class="violator-stats">
+                                ${info.total_violations} violations, severity: ${info.total_severity}
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-small btn-sinkhole" onclick="quickSinkhole('${ip}')">Sinkhole</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (html === '') {
+                html = '<div style="text-align: center; opacity: 0.6;">No recent violators</div>';
+            }
+
+            violatorsList.innerHTML = html;
+        }
+
+        function updateHoneypotStats(data) {
+            // Update honeypot statistics display
+            document.getElementById('webResponses').textContent = Math.floor(data.total_interactions * 0.4);
+            document.getElementById('apiResponses').textContent = Math.floor(data.total_interactions * 0.3);
+            document.getElementById('redirectLoops').textContent = Math.floor(data.total_interactions * 0.3);
+            document.getElementById('dataCollected').textContent = 
+                Math.floor(data.data_collected / 1024) + ' KB';
+        }
+
+        async function addToSinkhole() {
+            const target = document.getElementById('manualTarget').value.trim();
+            const type = document.getElementById('manualType').value;
+            const reason = document.getElementById('manualReason').value.trim() || 'Manual addition';
+
+            if (!target) {
+                addLog('error', '❌ Target is required');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/sinkhole/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target, type, reason })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `✅ Added ${target} to sinkhole: ${reason}`);
+                    document.getElementById('manualTarget').value = '';
+                    document.getElementById('manualReason').value = '';
+                } else {
+                    addLog('error', `❌ Failed to add to sinkhole: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function addToBlackhole() {
+            const target = document.getElementById('manualTarget').value.trim();
+            const type = document.getElementById('manualType').value;
+            const reason = document.getElementById('manualReason').value.trim() || 'Manual addition';
+
+            if (!target) {
+                addLog('error', '❌ Target is required');
+                return;
+            }
+
+            if (type === 'fingerprint') {
+                addLog('error', '❌ Fingerprints cannot be blackholed');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/blackhole/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target, type, reason })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `💀 Added ${target} to blackhole: ${reason}`);
+                    document.getElementById('manualTarget').value = '';
+                    document.getElementById('manualReason').value = '';
+                } else {
+                    addLog('error', `❌ Failed to add to blackhole: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function addToQuarantine() {
+            const ip = document.getElementById('quarantineIP').value.trim();
+            const duration = parseInt(document.getElementById('quarantineDuration').value);
+            const reason = 'Manual quarantine';
+
+            if (!ip) {
+                addLog('error', '❌ IP is required');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/quarantine/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, duration, reason })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('warning', `⏰ Quarantined ${ip} for ${duration} seconds`);
+                    document.getElementById('quarantineIP').value = '';
+                } else {
+                    addLog('error', `❌ Failed to quarantine: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function quickSinkhole(ip) {
+            try {
+                const response = await fetch('/api/sinkhole/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        target: ip, 
+                        type: 'ip', 
+                        reason: 'Quick action from violators list' 
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('success', `🕳️ Quick sinkholed ${ip}`);
+                } else {
+                    addLog('error', `❌ Quick sinkhole failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function exportThreatIntel() {
+            try {
+                const response = await fetch('/api/threat-intel/export');
+                const result = await response.json();
+
+                if (result.success) {
+                    const blob = new Blob([JSON.stringify(result.data, null, 2)], 
+                        { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `threat-intel-${new Date().toISOString().split('T')[0]}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    addLog('info', '📊 Threat intelligence exported');
+                } else {
+                    addLog('error', `❌ Export failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                addLog('error', `❌ Export error: ${error.message}`);
+            }
+        }
+
+        function addLog(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                type: type,
+                message: message,
+                timestamp: timestamp
+            };
+            
+            logEntries.push(logEntry);
+            
+            // Keep only last 50 entries
+            if (logEntries.length > 50) {
+                logEntries.shift();
+            }
+            
+            // Update log display
+            const logContainer = document.getElementById('actionLog');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry log-${type}`;
+            logDiv.textContent = `[${timestamp}] ${message}`;
+            
+            logContainer.appendChild(logDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            logEntries = [];
+            document.getElementById('actionLog').innerHTML = 
+                '<div class="log-entry log-info">Action log cleared</div>';
+        }
+    </script>
+</body>
+</html>

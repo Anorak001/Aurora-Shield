@@ -1,0 +1,151 @@
+# Render Blueprint - Aurora Shield
+# https://render.com/docs/blueprint-spec
+# This file enables automatic deployment on Render.com
+#
+# IMPORTANT: On Render, each service runs independently.
+# Services communicate via their public URLs, not internal Docker networking.
+# Use environment variables to configure service URLs.
+
+services:
+  # ============================================
+  # Demo Web Application (Primary CDN)
+  # This must be deployed FIRST as other services depend on it
+  # ============================================
+  - type: web
+    name: aurora-demo-webapp
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.webapp
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 80
+
+  # Demo Web Application CDN2
+  - type: web
+    name: aurora-demo-webapp-cdn2
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.webapp
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 80
+
+  # Demo Web Application CDN3
+  - type: web
+    name: aurora-demo-webapp-cdn3
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.webapp
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 80
+
+  # ============================================
+  # Load Balancer Service
+  # Routes traffic to demo-webapp instances
+  # ============================================
+  - type: web
+    name: aurora-loadbalancer
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.loadbalancer
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 8090
+      # URLs of CDN services (Render provides these after deployment)
+      - key: CDN_PRIMARY_URL
+        value: https://aurora-demo-webapp.onrender.com
+      - key: CDN_SECONDARY_URL
+        value: https://aurora-demo-webapp-cdn2.onrender.com
+      - key: CDN_TERTIARY_URL
+        value: https://aurora-demo-webapp-cdn3.onrender.com
+
+  # ============================================
+  # Attack Orchestrator Service
+  # Simulates and manages attack scenarios
+  # ============================================
+  - type: web
+    name: aurora-orchestrator
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.orchestrator
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: AURORA_SHIELD_URL
+        value: https://aurora-shield.onrender.com
+      - key: LOAD_BALANCER_URL
+        value: https://aurora-loadbalancer.onrender.com
+
+  # ============================================
+  # Aurora Shield Main Service (Production)
+  # Main dashboard and protection service
+  # ============================================
+  - type: web
+    name: aurora-shield
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: service_dashboard.py
+      - key: PORT
+        value: 8080
+      - key: LOAD_BALANCER_URL
+        value: https://aurora-loadbalancer.onrender.com
+      - key: ORCHESTRATOR_URL
+        value: https://aurora-orchestrator.onrender.com
+      - key: DEMO_WEBAPP_URL
+        value: https://aurora-demo-webapp.onrender.com
+
+  # ============================================
+  # Aurora Shield Staging (from finale branch)
+  # ============================================
+  - type: web
+    name: aurora-shield-staging
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: finale
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: staging
+      - key: FLASK_APP
+        value: service_dashboard.py
+      - key: PORT
+        value: 8080
+      - key: PORT
+        value: 8090

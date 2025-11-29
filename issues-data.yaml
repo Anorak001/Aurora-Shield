@@ -1,0 +1,824 @@
+# Aurora Shield - GitHub Issues Configuration
+# This file defines all issues to be created for the project
+# You can use this to manually create issues or with GitHub CLI
+
+issues:
+  # Phase 1: Core Infrastructure
+  - number: 1
+    title: "Setup CI/CD Pipeline and Testing Framework"
+    labels: ["infrastructure", "priority:high", "phase:1", "enhancement"]
+    milestone: "v1.0.0 - Core Infrastructure"
+    body: |
+      ## 📋 Description
+      Setup continuous integration and testing infrastructure for the project.
+
+      ## 🎯 Goals
+      - Configure GitHub Actions for automated testing
+      - Setup code quality checks (linting, formatting)
+      - Configure automated dependency updates
+      - Setup branch protection rules
+
+      ## ✅ Acceptance Criteria
+      - [ ] GitHub Actions workflow for running tests
+      - [ ] Pre-commit hooks configured
+      - [ ] Code coverage reporting setup
+      - [ ] Automated security scanning enabled
+
+      ## 🔗 Dependencies
+      None - This is a foundational task
+
+      ## 📦 Deliverables
+      - `.github/workflows/tests.yml`
+      - `.github/workflows/lint.yml`
+      - `.pre-commit-config.yaml`
+      - Updated `CONTRIBUTING.md` with CI/CD guidelines
+
+  - number: 2
+    title: "Implement Comprehensive Unit Tests for Core Components"
+    labels: ["testing", "priority:high", "phase:1", "good first issue"]
+    milestone: "v1.0.0 - Core Infrastructure"
+    body: |
+      ## 📋 Description
+      Create comprehensive unit tests for all core detection and mitigation components.
+
+      ## 🎯 Goals
+      - Write unit tests for `AnomalyDetector`
+      - Write unit tests for `RateLimiter`
+      - Write unit tests for `IPReputation`
+      - Write unit tests for `ChallengeResponse`
+      - Achieve 80%+ code coverage
+
+      ## ✅ Acceptance Criteria
+      - [ ] Tests for anomaly detection logic
+      - [ ] Tests for rate limiting algorithms
+      - [ ] Tests for IP reputation scoring
+      - [ ] Tests for challenge-response mechanisms
+      - [ ] All tests passing with >80% coverage
+
+      ## 🔗 Dependencies
+      - #1 (Testing framework setup)
+
+      ## 📦 Deliverables
+      - `tests/test_anomaly_detector.py`
+      - `tests/test_rate_limiter.py`
+      - `tests/test_ip_reputation.py`
+      - `tests/test_challenge_response.py`
+
+  # Phase 2: Enhanced Detection
+  - number: 3
+    title: "Enhance Anomaly Detector with Advanced Pattern Recognition"
+    labels: ["feature", "priority:high", "phase:2", "detection"]
+    milestone: "v1.1.0 - Enhanced Detection"
+    body: |
+      ## 📋 Description
+      Improve the rule-based anomaly detector with sophisticated pattern recognition and adaptive thresholds.
+
+      ## 🎯 Goals
+      - Implement sliding window algorithm with multiple time scales
+      - Add subnet-level tracking for distributed attacks
+      - Implement adaptive threshold adjustment
+      - Add whitelist/blacklist management
+      - Improve false positive reduction
+
+      ## ✅ Acceptance Criteria
+      - [ ] Multi-window detection (1min, 5min, 15min)
+      - [ ] Subnet-based tracking (/24, /16)
+      - [ ] Dynamic threshold adjustment based on baseline
+      - [ ] Whitelist/blacklist API endpoints
+      - [ ] Performance tests showing <10ms detection time
+
+      ## 🔗 Dependencies
+      - #2 (Unit tests)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/core/anomaly_detector.py`
+      - Configuration options in `default_config.py`
+      - Documentation in `ARCHITECTURE.md`
+
+  - number: 4
+    title: "Implement Advanced Rate Limiting with Multiple Strategies"
+    labels: ["feature", "priority:medium", "phase:2", "mitigation"]
+    milestone: "v1.1.0 - Enhanced Detection"
+    body: |
+      ## 📋 Description
+      Enhance rate limiting with multiple algorithms and per-endpoint controls.
+
+      ## 🎯 Goals
+      - Implement token bucket algorithm (already done)
+      - Add leaky bucket algorithm option
+      - Implement sliding window counter
+      - Add per-endpoint rate limiting
+      - Add user-based rate limiting (authenticated users)
+
+      ## ✅ Acceptance Criteria
+      - [ ] Multiple rate limiting algorithms available
+      - [ ] Per-endpoint configuration support
+      - [ ] User-based vs IP-based limiting
+      - [ ] Graceful degradation under load
+      - [ ] API documentation for configuration
+
+      ## 🔗 Dependencies
+      - #2 (Unit tests)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/mitigation/rate_limiter.py`
+      - Configuration schema updates
+      - API endpoints for runtime adjustment
+
+  - number: 5
+    title: "Enhance IP Reputation System with External Feeds"
+    labels: ["feature", "priority:medium", "phase:2", "mitigation"]
+    milestone: "v1.1.0 - Enhanced Detection"
+    body: |
+      ## 📋 Description
+      Improve IP reputation system with external threat intelligence feeds and persistent storage.
+
+      ## 🎯 Goals
+      - Integrate with external IP reputation services (AbuseIPDB, etc.)
+      - Add persistent storage for reputation data
+      - Implement reputation decay algorithm
+      - Add geographic blocking capabilities
+      - Add ASN-level reputation tracking
+
+      ## ✅ Acceptance Criteria
+      - [ ] Integration with at least 2 external feeds
+      - [ ] SQLite/Redis storage backend
+      - [ ] Reputation decay over time
+      - [ ] Geographic filtering support
+      - [ ] ASN blocking support
+
+      ## 🔗 Dependencies
+      - #2 (Unit tests)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/mitigation/ip_reputation.py`
+      - New `aurora_shield/integrations/threat_intel.py`
+      - Database schema and migration scripts
+
+  # Phase 3: Auto-Recovery
+  - number: 6
+    title: "Implement Auto-Scaling Integration for Cloud Providers"
+    labels: ["feature", "priority:high", "phase:3", "cloud", "auto-recovery"]
+    milestone: "v1.2.0 - Cloud Integration"
+    body: |
+      ## 📋 Description
+      Integrate with real cloud provider APIs for automatic scaling during attacks.
+
+      ## 🎯 Goals
+      - Implement AWS Auto Scaling integration
+      - Implement Azure VMSS integration
+      - Add GCP Managed Instance Groups support
+      - Add Kubernetes HPA integration
+      - Create unified scaling interface
+
+      ## ✅ Acceptance Criteria
+      - [ ] AWS auto-scaling working
+      - [ ] Azure auto-scaling working
+      - [ ] GCP auto-scaling working
+      - [ ] Kubernetes HPA integration
+      - [ ] Configurable scaling policies
+
+      ## 🔗 Dependencies
+      None
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/auto_recovery/recovery_manager.py`
+      - New `aurora_shield/cloud/aws_scaler.py`
+      - New `aurora_shield/cloud/azure_scaler.py`
+      - New `aurora_shield/cloud/gcp_scaler.py`
+      - New `aurora_shield/cloud/k8s_scaler.py`
+
+  - number: 7
+    title: "Implement Intelligent Traffic Redirection with CDN Integration"
+    labels: ["feature", "priority:medium", "phase:3", "cloud", "auto-recovery"]
+    milestone: "v1.2.0 - Cloud Integration"
+    body: |
+      ## 📋 Description
+      Add intelligent traffic routing with CDN and multiple backend support.
+
+      ## 🎯 Goals
+      - Integrate with Cloudflare API
+      - Integrate with AWS CloudFront
+      - Add DNS-based traffic shifting
+      - Implement health-check based routing
+      - Add A/B testing for traffic distribution
+
+      ## ✅ Acceptance Criteria
+      - [ ] Cloudflare integration working
+      - [ ] CloudFront integration working
+      - [ ] DNS failover implemented
+      - [ ] Health checks for backends
+      - [ ] Gradual traffic shifting
+
+      ## 🔗 Dependencies
+      - #6 (Auto-scaling)
+
+      ## 📦 Deliverables
+      - New `aurora_shield/routing/traffic_manager.py`
+      - CDN integration modules
+      - Health check system
+
+  # Phase 4: Monitoring & Visualization
+  - number: 8
+    title: "Build Production-Ready Web Dashboard with Real-Time Updates"
+    labels: ["feature", "priority:high", "phase:4", "dashboard", "ui"]
+    milestone: "v1.3.0 - Monitoring & Analytics"
+    body: |
+      ## 📋 Description
+      Create a modern, production-ready web dashboard with real-time monitoring capabilities.
+
+      ## 🎯 Goals
+      - Redesign UI with modern framework (React/Vue)
+      - Implement WebSocket for real-time updates
+      - Add interactive charts and graphs
+      - Add attack timeline visualization
+      - Add system health monitoring
+
+      ## ✅ Acceptance Criteria
+      - [ ] Modern responsive UI
+      - [ ] Real-time WebSocket updates
+      - [ ] Interactive D3.js/Chart.js visualizations
+      - [ ] Attack timeline and heatmaps
+      - [ ] System metrics dashboard
+      - [ ] Mobile-friendly design
+
+      ## 🔗 Dependencies
+      - #2 (Testing framework)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/dashboard/web_dashboard.py`
+      - New `aurora_shield/dashboard/static/` directory
+      - Frontend build system (Webpack/Vite)
+      - API documentation for dashboard endpoints
+
+  - number: 9
+    title: "Implement Complete ELK Stack Integration"
+    labels: ["feature", "priority:medium", "phase:4", "monitoring", "integration"]
+    milestone: "v1.3.0 - Monitoring & Analytics"
+    body: |
+      ## 📋 Description
+      Build production-ready integration with Elasticsearch, Logstash, and Kibana.
+
+      ## 🎯 Goals
+      - Setup Elasticsearch document mapping
+      - Create Logstash pipelines for data ingestion
+      - Build Kibana dashboards
+      - Add log rotation and retention policies
+      - Implement efficient bulk indexing
+
+      ## ✅ Acceptance Criteria
+      - [ ] Elasticsearch mappings defined
+      - [ ] Logstash pipeline configured
+      - [ ] Pre-built Kibana dashboards
+      - [ ] Log retention policies implemented
+      - [ ] Bulk indexing for performance
+      - [ ] Alert rules configured
+
+      ## 🔗 Dependencies
+      None
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/integrations/elk_integration.py`
+      - Elasticsearch mapping files
+      - Logstash configuration files
+      - Kibana dashboard exports
+      - Docker Compose for ELK stack
+
+  - number: 10
+    title: "Implement Prometheus Metrics and Grafana Dashboards"
+    labels: ["feature", "priority:medium", "phase:4", "monitoring", "integration"]
+    milestone: "v1.3.0 - Monitoring & Analytics"
+    body: |
+      ## 📋 Description
+      Complete Prometheus metrics integration with pre-built Grafana dashboards.
+
+      ## 🎯 Goals
+      - Implement Prometheus exporter endpoint
+      - Add comprehensive metrics collection
+      - Create Grafana dashboards
+      - Add alerting rules
+      - Document all metrics
+
+      ## ✅ Acceptance Criteria
+      - [ ] Prometheus /metrics endpoint
+      - [ ] 20+ relevant metrics collected
+      - [ ] 3+ pre-built Grafana dashboards
+      - [ ] Alert rules for critical conditions
+      - [ ] Metrics documentation
+
+      ## 🔗 Dependencies
+      None
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/integrations/prometheus_integration.py`
+      - Grafana dashboard JSON files
+      - Prometheus alert rules
+      - Metrics documentation
+
+  # Phase 5: Gateway & Edge Protection
+  - number: 11
+    title: "Build Production-Ready Flask Gateway with Advanced Features"
+    labels: ["feature", "priority:high", "phase:5", "gateway", "security"]
+    milestone: "v1.4.0 - Production Ready"
+    body: |
+      ## 📋 Description
+      Enhance Flask gateway with production features and security hardening.
+
+      ## 🎯 Goals
+      - Add HTTPS/TLS support
+      - Implement request logging and tracing
+      - Add health check endpoints
+      - Implement graceful shutdown
+      - Add request correlation IDs
+      - Add compression and caching
+
+      ## ✅ Acceptance Criteria
+      - [ ] HTTPS enabled with proper cert management
+      - [ ] Request tracing with correlation IDs
+      - [ ] Health check endpoints (/health, /ready)
+      - [ ] Graceful shutdown handling
+      - [ ] Response compression
+      - [ ] Production-ready WSGI server (Gunicorn)
+
+      ## 🔗 Dependencies
+      - #2 (Testing framework)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/gateway/flask_gateway.py`
+      - HTTPS configuration
+      - Gunicorn configuration
+      - Deployment documentation
+
+  - number: 12
+    title: "Create Nginx/HAProxy Configuration Templates"
+    labels: ["documentation", "priority:medium", "phase:5", "gateway"]
+    milestone: "v1.4.0 - Production Ready"
+    body: |
+      ## 📋 Description
+      Provide production-ready configuration templates for Nginx and HAProxy integration.
+
+      ## 🎯 Goals
+      - Create Nginx reverse proxy configuration
+      - Create HAProxy load balancer configuration
+      - Add rate limiting rules
+      - Add SSL/TLS termination
+      - Document best practices
+
+      ## ✅ Acceptance Criteria
+      - [ ] Nginx configuration template
+      - [ ] HAProxy configuration template
+      - [ ] Rate limiting rules
+      - [ ] SSL/TLS configuration
+      - [ ] DDoS protection rules
+      - [ ] Documented examples
+
+      ## 🔗 Dependencies
+      - #11 (Flask gateway)
+
+      ## 📦 Deliverables
+      - `configs/nginx.conf.template`
+      - `configs/haproxy.cfg.template`
+      - `docs/GATEWAY_SETUP.md`
+
+  # Phase 6: Testing & Simulation
+  - number: 13
+    title: "Enhance Attack Simulator with Realistic Traffic Patterns"
+    labels: ["feature", "priority:medium", "phase:6", "testing", "simulation"]
+    milestone: "v1.5.0 - Advanced Testing"
+    body: |
+      ## 📋 Description
+      Improve attack simulator with realistic attack patterns and legitimate traffic simulation.
+
+      ## 🎯 Goals
+      - Add L7 attack patterns (HTTP flood, Slowloris)
+      - Add L4 attack patterns (SYN flood, UDP flood)
+      - Add legitimate traffic simulation
+      - Add distributed attack simulation
+      - Add attack reporting and analysis
+
+      ## ✅ Acceptance Criteria
+      - [ ] Multiple L7 attack types
+      - [ ] Multiple L4 attack types
+      - [ ] Legitimate traffic generator
+      - [ ] Distributed botnet simulation
+      - [ ] Attack effectiveness reports
+      - [ ] Configurable attack parameters
+
+      ## 🔗 Dependencies
+      - #2 (Testing framework)
+
+      ## 📦 Deliverables
+      - Enhanced `aurora_shield/attack_sim/simulator.py`
+      - New attack pattern modules
+      - Attack configuration templates
+      - Simulation reports
+
+  - number: 14
+    title: "Create Integration Tests for End-to-End Scenarios"
+    labels: ["testing", "priority:high", "phase:6", "integration"]
+    milestone: "v1.5.0 - Advanced Testing"
+    body: |
+      ## 📋 Description
+      Build comprehensive integration tests covering realistic attack scenarios.
+
+      ## 🎯 Goals
+      - Test complete request flow
+      - Test attack detection and mitigation
+      - Test auto-recovery scenarios
+      - Test multi-component interaction
+      - Add performance benchmarks
+
+      ## ✅ Acceptance Criteria
+      - [ ] 10+ integration test scenarios
+      - [ ] Attack simulation tests
+      - [ ] Recovery mechanism tests
+      - [ ] Load testing scenarios
+      - [ ] Performance benchmarks
+      - [ ] CI/CD integration
+
+      ## 🔗 Dependencies
+      - #1 (CI/CD setup)
+      - #13 (Attack simulator)
+
+      ## 📦 Deliverables
+      - `tests/integration/` test suite
+      - Performance benchmarks
+      - Load testing scripts
+      - CI/CD integration
+
+  # Phase 7: Documentation & Examples
+  - number: 15
+    title: "Create Comprehensive Documentation and Tutorials"
+    labels: ["documentation", "priority:high", "phase:7", "good first issue"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Build complete documentation including tutorials, API reference, and deployment guides.
+
+      ## 🎯 Goals
+      - Write getting started guide
+      - Document all APIs
+      - Create deployment guides for major platforms
+      - Add troubleshooting guide
+      - Create video tutorials
+
+      ## ✅ Acceptance Criteria
+      - [ ] Getting started guide (30 min to deploy)
+      - [ ] Complete API reference
+      - [ ] AWS deployment guide
+      - [ ] Azure deployment guide
+      - [ ] GCP deployment guide
+      - [ ] Kubernetes deployment guide
+      - [ ] Troubleshooting guide
+      - [ ] Architecture diagrams
+
+      ## 🔗 Dependencies
+      None - Can be done in parallel
+
+      ## 📦 Deliverables
+      - `docs/GETTING_STARTED.md`
+      - `docs/API_REFERENCE.md`
+      - `docs/DEPLOYMENT_AWS.md`
+      - `docs/DEPLOYMENT_AZURE.md`
+      - `docs/DEPLOYMENT_GCP.md`
+      - `docs/DEPLOYMENT_K8S.md`
+      - `docs/TROUBLESHOOTING.md`
+      - Architecture diagrams
+
+  - number: 16
+    title: "Create Example Applications and Use Cases"
+    labels: ["documentation", "priority:medium", "phase:7", "examples"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Build example applications demonstrating Aurora Shield integration patterns.
+
+      ## 🎯 Goals
+      - Create Flask application example
+      - Create FastAPI application example
+      - Create Django application example
+      - Create microservices example
+      - Create Kubernetes example
+
+      ## ✅ Acceptance Criteria
+      - [ ] Working Flask example
+      - [ ] Working FastAPI example
+      - [ ] Working Django example
+      - [ ] Microservices architecture example
+      - [ ] Kubernetes deployment example
+      - [ ] README for each example
+
+      ## 🔗 Dependencies
+      - #15 (Documentation)
+
+      ## 📦 Deliverables
+      - `examples/flask_app/`
+      - `examples/fastapi_app/`
+      - `examples/django_app/`
+      - `examples/microservices/`
+      - `examples/kubernetes/`
+
+  # Phase 8: Deployment & DevOps
+  - number: 17
+    title: "Create Docker Images and Kubernetes Manifests"
+    labels: ["devops", "priority:high", "phase:8", "docker", "kubernetes"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Package Aurora Shield as Docker containers with Kubernetes deployment support.
+
+      ## 🎯 Goals
+      - Create production Docker images
+      - Create Kubernetes manifests
+      - Setup Helm charts
+      - Add docker-compose for local development
+      - Publish to Docker Hub
+
+      ## ✅ Acceptance Criteria
+      - [ ] Optimized Docker images (<500MB)
+      - [ ] Kubernetes Deployment manifests
+      - [ ] Kubernetes Service manifests
+      - [ ] ConfigMaps and Secrets handling
+      - [ ] Helm chart with values
+      - [ ] docker-compose.yml for local dev
+      - [ ] Published to Docker Hub
+
+      ## 🔗 Dependencies
+      - #11 (Flask gateway)
+
+      ## 📦 Deliverables
+      - `Dockerfile`
+      - `k8s/deployment.yaml`
+      - `k8s/service.yaml`
+      - `k8s/configmap.yaml`
+      - `helm/aurora-shield/`
+      - `docker-compose.yml`
+
+  - number: 18
+    title: "Setup Terraform Infrastructure as Code"
+    labels: ["devops", "priority:medium", "phase:8", "terraform", "iac"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Create Terraform modules for deploying Aurora Shield to major cloud providers.
+
+      ## 🎯 Goals
+      - Create AWS Terraform module
+      - Create Azure Terraform module
+      - Create GCP Terraform module
+      - Add network security configurations
+      - Add monitoring stack deployment
+
+      ## ✅ Acceptance Criteria
+      - [ ] AWS module (EC2, ALB, Auto Scaling)
+      - [ ] Azure module (VM, Load Balancer, VMSS)
+      - [ ] GCP module (Compute Engine, Load Balancer, MIG)
+      - [ ] Network security groups/firewall rules
+      - [ ] Monitoring stack (Prometheus, Grafana)
+      - [ ] Variables and outputs documented
+
+      ## 🔗 Dependencies
+      - #6 (Auto-scaling)
+
+      ## 📦 Deliverables
+      - `terraform/aws/`
+      - `terraform/azure/`
+      - `terraform/gcp/`
+      - `terraform/modules/`
+      - `terraform/README.md`
+
+  # Phase 9: Security & Performance
+  - number: 19
+    title: "Conduct Security Audit and Implement Hardening"
+    labels: ["security", "priority:critical", "phase:9"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Perform comprehensive security audit and implement security best practices.
+
+      ## 🎯 Goals
+      - Run security scanning tools
+      - Fix identified vulnerabilities
+      - Implement security headers
+      - Add input validation everywhere
+      - Implement rate limiting on admin endpoints
+      - Add security documentation
+
+      ## ✅ Acceptance Criteria
+      - [ ] Bandit security scan passing
+      - [ ] No high/critical vulnerabilities
+      - [ ] Security headers implemented
+      - [ ] Input validation on all endpoints
+      - [ ] Admin endpoint protection
+      - [ ] Security best practices documented
+      - [ ] OWASP compliance check
+
+      ## 🔗 Dependencies
+      - #11 (Flask gateway)
+
+      ## 📦 Deliverables
+      - Security audit report
+      - Fixed vulnerabilities
+      - `docs/SECURITY.md`
+      - Security test suite
+
+  - number: 20
+    title: "Performance Optimization and Benchmarking"
+    labels: ["performance", "priority:high", "phase:9", "optimization"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Optimize system performance and establish performance benchmarks.
+
+      ## 🎯 Goals
+      - Profile code for bottlenecks
+      - Optimize hot paths
+      - Implement caching strategies
+      - Add connection pooling
+      - Create performance benchmarks
+      - Document performance characteristics
+
+      ## ✅ Acceptance Criteria
+      - [ ] Profiling reports generated
+      - [ ] Bottlenecks identified and fixed
+      - [ ] Redis caching implemented
+      - [ ] Database connection pooling
+      - [ ] <5ms average processing time
+      - [ ] Can handle 10,000 req/s
+      - [ ] Performance benchmark suite
+
+      ## 🔗 Dependencies
+      - #14 (Integration tests)
+
+      ## 📦 Deliverables
+      - Performance improvements
+      - Caching layer
+      - Benchmark suite
+      - Performance documentation
+
+  # Phase 10: Community & Maintenance
+  - number: 21
+    title: "Setup Community Guidelines and Contribution Process"
+    labels: ["community", "priority:medium", "phase:10", "documentation"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Establish community guidelines, contribution process, and maintainer documentation.
+
+      ## 🎯 Goals
+      - Create detailed CONTRIBUTING.md
+      - Setup issue templates
+      - Setup PR templates
+      - Create CODE_OF_CONDUCT.md
+      - Setup discussions and wiki
+
+      ## ✅ Acceptance Criteria
+      - [ ] CONTRIBUTING.md with clear guidelines
+      - [ ] Issue templates for bugs/features
+      - [ ] PR template with checklist
+      - [ ] CODE_OF_CONDUCT.md
+      - [ ] GitHub Discussions enabled
+      - [ ] Wiki pages created
+
+      ## 🔗 Dependencies
+      None
+
+      ## 📦 Deliverables
+      - Enhanced `CONTRIBUTING.md`
+      - `.github/ISSUE_TEMPLATE/`
+      - `.github/PULL_REQUEST_TEMPLATE.md`
+      - `CODE_OF_CONDUCT.md`
+      - Wiki pages
+
+  - number: 22
+    title: "Setup Automated Releases and Changelog Generation"
+    labels: ["devops", "priority:low", "phase:10", "automation"]
+    milestone: "v2.0.0 - Production Release"
+    body: |
+      ## 📋 Description
+      Automate release process with semantic versioning and changelog generation.
+
+      ## 🎯 Goals
+      - Setup semantic-release
+      - Automate changelog generation
+      - Setup PyPI publishing
+      - Create release notes template
+      - Setup version bumping
+
+      ## ✅ Acceptance Criteria
+      - [ ] Semantic versioning enforced
+      - [ ] Auto-generated CHANGELOG.md
+      - [ ] PyPI auto-publishing on release
+      - [ ] GitHub releases with notes
+      - [ ] Version bumping automated
+
+      ## 🔗 Dependencies
+      - #1 (CI/CD setup)
+
+      ## 📦 Deliverables
+      - `.github/workflows/release.yml`
+      - Release configuration
+      - PyPI publishing setup
+      - Release documentation
+
+# Labels to create
+labels:
+  - name: "infrastructure"
+    color: "0366d6"
+  - name: "testing"
+    color: "d4c5f9"
+  - name: "feature"
+    color: "a2eeef"
+  - name: "detection"
+    color: "1d76db"
+  - name: "mitigation"
+    color: "5319e7"
+  - name: "cloud"
+    color: "fbca04"
+  - name: "auto-recovery"
+    color: "0e8a16"
+  - name: "dashboard"
+    color: "d876e3"
+  - name: "ui"
+    color: "e99695"
+  - name: "monitoring"
+    color: "f9d0c4"
+  - name: "integration"
+    color: "c5def5"
+  - name: "gateway"
+    color: "bfd4f2"
+  - name: "security"
+    color: "d93f0b"
+  - name: "simulation"
+    color: "c2e0c6"
+  - name: "documentation"
+    color: "0075ca"
+  - name: "examples"
+    color: "bfdadc"
+  - name: "devops"
+    color: "1f883d"
+  - name: "docker"
+    color: "2188ff"
+  - name: "kubernetes"
+    color: "326ce5"
+  - name: "terraform"
+    color: "5c4ee5"
+  - name: "iac"
+    color: "7057ff"
+  - name: "performance"
+    color: "e4e669"
+  - name: "optimization"
+    color: "fbca04"
+  - name: "community"
+    color: "fef2c0"
+  - name: "automation"
+    color: "bfe5bf"
+  - name: "priority:critical"
+    color: "b60205"
+  - name: "priority:high"
+    color: "d93f0b"
+  - name: "priority:medium"
+    color: "fbca04"
+  - name: "priority:low"
+    color: "0e8a16"
+  - name: "phase:1"
+    color: "c2e0c6"
+  - name: "phase:2"
+    color: "bfdadc"
+  - name: "phase:3"
+    color: "d4c5f9"
+  - name: "phase:4"
+    color: "f9d0c4"
+  - name: "phase:5"
+    color: "fef2c0"
+  - name: "phase:6"
+    color: "e99695"
+  - name: "phase:7"
+    color: "bfd4f2"
+  - name: "phase:8"
+    color: "c5def5"
+  - name: "phase:9"
+    color: "d876e3"
+  - name: "phase:10"
+    color: "fbca04"
+  - name: "enhancement"
+    color: "a2eeef"
+  - name: "good first issue"
+    color: "7057ff"
+
+# Milestones to create
+milestones:
+  - title: "v1.0.0 - Core Infrastructure"
+    description: "Basic infrastructure, testing, and CI/CD setup"
+  - title: "v1.1.0 - Enhanced Detection"
+    description: "Advanced detection and mitigation features"
+  - title: "v1.2.0 - Cloud Integration"
+    description: "Cloud provider integration and auto-scaling"
+  - title: "v1.3.0 - Monitoring & Analytics"
+    description: "Comprehensive monitoring and visualization"
+  - title: "v1.4.0 - Production Ready"
+    description: "Production-ready gateway and deployment"
+  - title: "v1.5.0 - Advanced Testing"
+    description: "Advanced testing and simulation"
+  - title: "v2.0.0 - Production Release"
+    description: "Full production release with documentation"

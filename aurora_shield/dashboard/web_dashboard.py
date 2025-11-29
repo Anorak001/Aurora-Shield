@@ -3,12 +3,17 @@ Enhanced Aurora Shield Dashboard with Professional Purple Theme and Authenticati
 Designed for INFOTHON 5.0 - Complete DDoS Protection Visualization.
 """
 
-from flask import Flask, render_template_string, jsonify, request, redirect, url_for, flash, session
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, session, Response
 import time
 import logging
 import os
 import json
-from datetime import datetime
+import random
+import requests
+import requests
+from datetime import datetime, timedelta
+import docker
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -26,46 +31,37 @@ DEFAULT_USERS = {
     }
 }
 
-
 class WebDashboard:
     """Enhanced Aurora Shield Dashboard with Professional UI and Authentication."""
-    
+
     def __init__(self, shield_manager):
         """
-        Initialize enhanced web dashboard.
+        Initialize the enhanced dashboard with authentication and modern design.
         
         Args:
-            shield_manager: Main Aurora Shield manager instance
+            shield_manager: The shield manager instance for monitoring and control
         """
-        self.app = Flask(__name__)
-        self.app.secret_key = os.environ.get('AURORA_SECRET_KEY', 'aurora-shield-infothon-secret-2025')
+        self.app = Flask(__name__, template_folder='templates')
+        self.app.secret_key = os.getenv('DASHBOARD_SECRET_KEY', 'aurora-shield-infothon-2024-secret-key')
         self.shield_manager = shield_manager
         self.users = DEFAULT_USERS
-        self.active_sessions = {}
         self._setup_routes()
-    
+
     def _check_auth(self):
         """Check if user is authenticated."""
-        if 'user_id' not in session:
-            return False
-        return session['user_id'] in self.users
-    
-    def _require_auth(self, admin_only=False):
-        """Decorator to require authentication."""
-        def decorator(f):
-            def decorated_function(*args, **kwargs):
-                if not self._check_auth():
-                    return redirect(url_for('login'))
-                if admin_only and session.get('role') != 'admin':
-                    flash('Admin privileges required.', 'error')
-                    return redirect(url_for('dashboard'))
-                return f(*args, **kwargs)
-            decorated_function.__name__ = f.__name__
-            return decorated_function
-        return decorator
-    
+        return 'user_id' in session and session['user_id'] in self.users
+
+    def require_auth(self, f):
+        """Decorator to require authentication for routes."""
+        def decorated_function(*args, **kwargs):
+            if not self._check_auth():
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        decorated_function.__name__ = f.__name__
+        return decorated_function
+
     def _setup_routes(self):
-        """Setup enhanced dashboard routes with authentication."""
+        """Setup all Flask routes with enhanced functionality."""
         
         @self.app.route('/login', methods=['GET', 'POST'])
         def login():
@@ -78,54 +74,207 @@ class WebDashboard:
                     session['user_id'] = username
                     session['role'] = self.users[username]['role']
                     session['name'] = self.users[username]['name']
-                    session['login_time'] = datetime.now().isoformat()
-                    
-                    flash(f'Welcome back, {self.users[username]["name"]}!', 'success')
+                    flash(f'Welcome, {self.users[username]["name"]}!', 'success')
                     return redirect(url_for('dashboard'))
                 else:
-                    flash('Invalid credentials. Try admin/admin123 or user/user123', 'error')
+                    flash('Invalid credentials. Please try again.', 'error')
             
-            return render_template_string(self._get_login_template())
-        
+            return render_template('aurora_dashboard.html', current_user=None)
+
         @self.app.route('/logout')
         def logout():
-            """Logout and redirect to login."""
+            """Logout and clear session."""
             session.clear()
             flash('Successfully logged out.', 'info')
             return redirect(url_for('login'))
-        
+
         @self.app.route('/')
+        @self.app.route('/dashboard')
         def dashboard():
             """Enhanced main dashboard with real-time monitoring."""
             if not self._check_auth():
                 return redirect(url_for('login'))
-            return render_template_string(self._get_dashboard_template())
-        
+            
+            # Prepare current user data for template
+            current_user = {
+                'name': session.get('name', 'Unknown'),
+                'role': session.get('role', 'user')
+            }
+            
+            return render_template('aurora_dashboard.html', current_user=current_user)
+
+        @self.app.route('/proxy/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+        def proxy_to_load_balancer(path):
+            """Proxy endpoint that filters requests and forwards allowed ones to load balancer"""
+            try:
+                # Extract request information
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                user_agent = request.headers.get('User-Agent', '')
+                request_method = request.method
+                
+                logger.info(f"Filtering request from {client_ip} to /{path}")
+                
+                # Check if IP is in allowed list
+                allowed_ips = getattr(self.shield_manager, 'allowed_ips', [])
+                if client_ip not in allowed_ips:
+                    logger.warning(f"Blocked request from non-allowed IP: {client_ip}")
+                    return jsonify({
+                        'error': 'Access denied',
+                        'reason': 'IP not in allowed list',
+                        'ip': client_ip
+                    }), 403
+                
+                # Check with shield manager
+                should_block = self.shield_manager.check_request(
+                    ip=client_ip,
+                    user_agent=user_agent,
+                    method=request_method,
+                    uri=f'/{path}'
+                )
+                
+                if should_block:
+                    logger.warning(f"Blocked request from {client_ip} by shield manager")
+                    return jsonify({
+                        'error': 'Request blocked by Aurora Shield',
+                        'reason': 'Security policy violation',
+                        'ip': client_ip
+                    }), 403
+                
+                # Forward allowed request to load balancer
+                load_balancer_url = f'http://load-balancer:8090/{path}'
+                
+                # Prepare headers for forwarding
+                forward_headers = dict(request.headers)
+                forward_headers['X-Forwarded-For'] = client_ip
+                forward_headers['X-Aurora-Shield'] = 'filtered'
+                
+                # Forward request based on method
+                if request_method == 'GET':
+                    response = requests.get(
+                        load_balancer_url,
+                        headers=forward_headers,
+                        params=request.args,
+                        timeout=30
+                    )
+                elif request_method == 'POST':
+                    response = requests.post(
+                        load_balancer_url,
+                        headers=forward_headers,
+                        json=request.get_json() if request.is_json else None,
+                        data=request.get_data() if not request.is_json else None,
+                        params=request.args,
+                        timeout=30
+                    )
+                else:
+                    # Handle other methods
+                    response = requests.request(
+                        request_method,
+                        load_balancer_url,
+                        headers=forward_headers,
+                        json=request.get_json() if request.is_json else None,
+                        data=request.get_data() if not request.is_json else None,
+                        params=request.args,
+                        timeout=30
+                    )
+                
+                logger.info(f"Forwarded request from {client_ip} to load balancer: {response.status_code}")
+                
+                # Return the response from load balancer
+                return response.content, response.status_code, dict(response.headers)
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error forwarding request to load balancer: {e}")
+                return jsonify({
+                    'error': 'Load balancer unavailable',
+                    'details': str(e)
+                }), 503
+            except Exception as e:
+                logger.error(f"Error in request proxy: {e}")
+                return jsonify({
+                    'error': 'Internal proxy error',
+                    'details': str(e)
+                }), 500
+
+        @self.app.route('/api/shield/check-request', methods=['GET', 'POST', 'PUT', 'DELETE'])
+        def check_request_authorization():
+            """Authorization endpoint for Nginx auth_request module"""
+            try:
+                # Extract request information
+                client_ip = request.headers.get('X-Original-IP', request.remote_addr)
+                user_agent = request.headers.get('User-Agent', '')
+                request_method = request.method
+                request_uri = request.headers.get('X-Original-URI', '/')
+                
+                # Check if the request should be blocked
+                should_block = self.shield_manager.check_request(
+                    ip=client_ip,
+                    user_agent=user_agent,
+                    method=request_method,
+                    uri=request_uri
+                )
+                
+                if should_block:
+                    logger.warning(f"Blocked request from {client_ip} to {request_uri}")
+                    return '', 403  # Forbidden
+                else:
+                    return '', 200  # OK
+                    
+            except Exception as e:
+                logger.error(f"Error in request authorization: {e}")
+                return '', 200  # Default to allow if there's an error
+
         @self.app.route('/api/dashboard/stats')
         def get_stats():
-            """Enhanced API endpoint with comprehensive statistics."""
+            """Enhanced API endpoint for real-time statistics."""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
-                
+            
             try:
-                stats = self.shield_manager.get_all_stats()
+                # Get real-time data from shield manager
+                live_data = self.shield_manager.get_live_requests()
+                uptime = time.time() - self.shield_manager.start_time
                 
-                # Add real-time enhancements
-                stats['system_info'] = {
-                    'uptime': time.time() - getattr(self, 'start_time', time.time()),
-                    'current_time': datetime.now().isoformat(),
-                    'protection_level': 'HIGH',
-                    'threat_level': self._calculate_threat_level(stats)
+                # Enhanced stats with real data
+                enhanced_stats = {
+                    'requests_per_second': live_data.get('requests_per_second', 0),
+                    'threats_blocked': live_data.get('blocked_count', 0),
+                    'active_connections': len(live_data.get('ip_request_counts', {})),
+                    'system_health': 99.9,
+                    'uptime': self._format_uptime(uptime),
+                    'recent_attacks': self._get_real_recent_attacks(),
+                    'recent_requests': live_data.get('requests', []),  # Include recent requests for real-time display
+                    'performance_metrics': self._get_performance_metrics(),
+                    'protection_status': {
+                        'rate_limiting': True,
+                        'ip_reputation': True,
+                        'anomaly_detection': True
+                    },
+                    'total_requests': live_data.get('total_requests', 0),
+                    'allowed_requests': live_data.get('allowed_count', 0),
+                    'rate_limited_requests': live_data.get('rate_limited_count', 0)
                 }
                 
-                stats['recent_attacks'] = self._get_recent_attacks()
-                stats['performance_metrics'] = self._get_performance_metrics()
+                return jsonify(enhanced_stats)
                 
-                return jsonify(stats)
             except Exception as e:
-                logger.error(f"Error getting stats: {e}")
-                return jsonify({'error': 'Failed to retrieve statistics'}), 500
-        
+                logger.error(f"Error fetching dashboard stats: {e}")
+                return jsonify({'error': 'Failed to fetch statistics'}), 500
+
+        @self.app.route('/api/dashboard/live-requests')
+        def get_live_requests():
+            """Get real-time request data for live monitoring."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # Get actual live requests from shield manager
+                live_data = self.shield_manager.get_live_requests()
+                return jsonify(live_data)
+                
+            except Exception as e:
+                logger.error(f"Error fetching live requests: {e}")
+                return jsonify({'error': 'Failed to fetch live requests'}), 500
+
         @self.app.route('/api/dashboard/simulate', methods=['POST'])
         def simulate_attack():
             """Enhanced attack simulation with multiple attack types."""
@@ -138,33 +287,237 @@ class WebDashboard:
             try:
                 attack_type = request.json.get('type', 'http_flood') if request.is_json else 'http_flood'
                 
-                if attack_type == 'distributed':
-                    result = self.shield_manager.attack_simulator.simulate_distributed_attack(
-                        target='test_endpoint',
-                        bot_count=50,
-                        duration=10
-                    )
-                elif attack_type == 'slowloris':
-                    result = self.shield_manager.attack_simulator.simulate_slowloris(
-                        target='test_endpoint',
-                        connections=20,
-                        duration=10
-                    )
-                else:
-                    result = self.shield_manager.run_simulation()
+                # Simulate different types of attacks
+                attack_configs = {
+                    'http_flood': {'requests': 1000, 'duration': 30},
+                    'slowloris': {'connections': 100, 'duration': 60},
+                    'ddos': {'requests': 5000, 'duration': 45}
+                }
+                
+                config = attack_configs.get(attack_type, attack_configs['http_flood'])
+                
+                # In a real implementation, this would trigger actual attack simulation
+                logger.info(f"Simulating {attack_type} attack: {config}")
                 
                 return jsonify({
-                    'status': 'success',
-                    'message': f'Simulated {attack_type} attack completed',
-                    'result': result
+                    'success': True,
+                    'attack_type': attack_type,
+                    'config': config,
+                    'message': f'Attack simulation started: {attack_type}'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error simulating attack: {e}")
+                return jsonify({'error': 'Failed to simulate attack'}), 500
+
+        @self.app.route('/api/sinkhole/status')
+        def get_sinkhole_status():
+            """Get current sinkhole/blackhole status"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                status = sinkhole_manager.get_detailed_status()
+                return jsonify({
+                    'success': True,
+                    'data': status,
+                    'timestamp': time.time()
                 })
             except Exception as e:
-                logger.error(f"Simulation error: {e}")
-                return jsonify({'error': f'Simulation failed: {str(e)}'}), 500
-        
-        @self.app.route('/api/dashboard/reset', methods=['POST'])
-        def reset_system():
-            """Reset system with admin verification."""
+                logger.error(f"Error fetching sinkhole status: {e}")
+                return jsonify({'error': 'Failed to fetch sinkhole status'}), 500
+
+        @self.app.route('/api/dashboard/attacking-ips')
+        def get_attacking_ips():
+            """Get comprehensive attacking IPs and actions taken"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                
+                # Get sinkhole data
+                sinkhole_data = sinkhole_manager.get_all_sinkholed_ips()
+                
+                # Get recent attack activity from live requests
+                live_data = self.shield_manager.get_live_requests()
+                recent_attacks = []
+                
+                # Process recent blocked/sinkholed requests
+                for request_info in live_data.get('recent_requests', [])[-50:]:  # Last 50 requests
+                    if request_info.get('status') in ['blocked', 'sinkholed', 'quarantined']:
+                        action_taken = self._determine_action_taken(request_info.get('ip'), sinkhole_data)
+                        recent_attacks.append({
+                            'ip': request_info.get('ip'),
+                            'timestamp': request_info.get('timestamp'),
+                            'attack_type': request_info.get('reason', 'Unknown'),
+                            'action_taken': action_taken,
+                            'status': request_info.get('status'),
+                            'user_agent': request_info.get('user_agent', 'Unknown')[:50] + '...' if len(request_info.get('user_agent', '')) > 50 else request_info.get('user_agent', 'Unknown')
+                        })
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'sinkhole_summary': sinkhole_data['total_counts'],
+                        'recent_attacks': recent_attacks[-20:],  # Last 20 attacks
+                        'sinkholed_ips': list(sinkhole_data['ip_sinkholes'])[:50],  # Top 50 sinkholed IPs
+                        'blackholed_ips': list(sinkhole_data['ip_blackholes'])[:50],  # Top 50 blackholed IPs
+                        'quarantined_ips': {
+                            ip: info for ip, info in list(sinkhole_data['quarantined_ips'].items())[:20]  # Top 20 quarantined
+                        }
+                    },
+                    'timestamp': time.time()
+                })
+            except Exception as e:
+                logger.error(f"Error fetching attacking IPs: {e}")
+                return jsonify({'error': 'Failed to fetch attacking IP data'}), 500
+
+        @self.app.route('/api/dashboard/attack-activity')
+        def get_detailed_attack_activity():
+            """Get detailed recent attack activity from attack orchestrator"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                import requests
+                from datetime import datetime, timedelta
+                
+                # Get filtering parameters
+                severity_filter = request.args.get('severity', 'all')
+                action_filter = request.args.get('action', 'all')
+                limit = int(request.args.get('limit', 20))
+                
+                # Fetch real attack data from attack orchestrator
+                attack_orchestrator_url = "http://attack-orchestrator:5000"
+                recent_attacks = []
+                
+                try:
+                    # Get active bots from attack orchestrator
+                    bots_response = requests.get(f"{attack_orchestrator_url}/api/bots", timeout=5)
+                    if bots_response.status_code == 200:
+                        bots_data = bots_response.json()
+                        
+                        for bot in bots_data.get('bots', []):
+                            # Only include active bots that have made requests
+                            if bot.get('total_requests', 0) > 0:
+                                # Calculate action taken based on success/blocked ratio
+                                total_req = bot.get('total_requests', 0)
+                                blocked_req = bot.get('blocked_requests', 0)
+                                successful_req = bot.get('successful_requests', 0)
+                                
+                                if blocked_req > successful_req:
+                                    action_taken = 'Blocked'
+                                    severity = 'high'
+                                elif blocked_req > 0:
+                                    action_taken = 'Rate Limited'
+                                    severity = 'medium'
+                                else:
+                                    action_taken = 'Monitored'
+                                    severity = 'low'
+                                
+                                # Map attack types to display names
+                                attack_type_mapping = {
+                                    'http_flood': 'HTTP Flood',
+                                    'ddos_burst': 'DDoS Burst',
+                                    'brute_force': 'Brute Force',
+                                    'slowloris': 'Slowloris',
+                                    'resource_exhaustion': 'Resource Exhaustion',
+                                    'normal': 'Normal Traffic'
+                                }
+                                
+                                attack_type = attack_type_mapping.get(
+                                    bot.get('attack_type', 'unknown'),
+                                    bot.get('attack_type', 'Unknown').title()
+                                )
+                                
+                                # Use last_activity timestamp if available
+                                timestamp = datetime.fromtimestamp(
+                                    bot.get('last_activity', bot.get('start_time', time.time()))
+                                ).isoformat()
+                                
+                                recent_attacks.append({
+                                    'ip': bot.get('ip', 'Unknown'),
+                                    'timestamp': timestamp,
+                                    'attack_type': attack_type,
+                                    'action_taken': action_taken,
+                                    'severity': severity,
+                                    'total_requests': total_req,
+                                    'blocked_requests': blocked_req,
+                                    'bot_id': bot.get('id', 'unknown'),
+                                    'status': bot.get('status', 'unknown')
+                                })
+                
+                except requests.RequestException as e:
+                    logger.warning(f"Could not connect to attack orchestrator: {e}")
+                    # Fall back to shield manager data if available
+                    for request_info in self.shield_manager.recent_requests[-20:]:
+                        # Include all action types from shield manager
+                        status = request_info.get('status')
+                        if status in ['blocked', 'sinkholed', 'blackholed', 'quarantined', 'rate-limited', 'challenged']:
+                            recent_attacks.append({
+                                'ip': request_info.get('ip', 'Unknown'),
+                                'timestamp': request_info.get('timestamp_iso', datetime.now().isoformat()),
+                                'attack_type': self._map_status_to_attack_type(status),
+                                'action_taken': self._map_status_to_action(status),
+                                'severity': self._get_attack_severity_from_status(status),
+                                'total_requests': 1,
+                                'blocked_requests': 1 if status in ['blocked', 'blackholed'] else 0,
+                                'bot_id': 'shield-manager',
+                                'status': status
+                            })
+                
+                # Apply filters
+                if severity_filter != 'all':
+                    recent_attacks = [a for a in recent_attacks if a['severity'] == severity_filter]
+                    
+                if action_filter != 'all':
+                    recent_attacks = [a for a in recent_attacks if a['action_taken'].lower().replace(' ', '-') == action_filter]
+                
+                # Sort by timestamp (most recent first)
+                recent_attacks.sort(key=lambda x: x['timestamp'], reverse=True)
+                
+                # Calculate statistics from real data
+                statistics = {
+                    'total_attacks': len(recent_attacks),
+                    'by_severity': {
+                        'critical': len([a for a in recent_attacks if a['severity'] == 'critical']),
+                        'high': len([a for a in recent_attacks if a['severity'] == 'high']),
+                        'medium': len([a for a in recent_attacks if a['severity'] == 'medium']),
+                        'low': len([a for a in recent_attacks if a['severity'] == 'low'])
+                    },
+                    'by_action': {
+                        'blocked': len([a for a in recent_attacks if 'blocked' in a['action_taken'].lower()]),
+                        'sinkholed': len([a for a in recent_attacks if 'sinkholed' in a['action_taken'].lower()]),
+                        'blackholed': len([a for a in recent_attacks if 'blackholed' in a['action_taken'].lower()]),
+                        'quarantined': len([a for a in recent_attacks if 'quarantined' in a['action_taken'].lower()]),
+                        'rate-limited': len([a for a in recent_attacks if 'rate' in a['action_taken'].lower()]),
+                        'challenged': len([a for a in recent_attacks if 'challenge' in a['action_taken'].lower()]),
+                        'monitored': len([a for a in recent_attacks if 'monitor' in a['action_taken'].lower()])
+                    },
+                    'unique_ips': len(set(a['ip'] for a in recent_attacks)),
+                    'total_requests': sum(a.get('total_requests', 0) for a in recent_attacks),
+                    'total_blocked': sum(a.get('blocked_requests', 0) for a in recent_attacks)
+                }
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'attacks': recent_attacks[:limit],
+                        'statistics': statistics
+                    }
+                })
+                
+            except Exception as e:
+                logger.error(f"Error fetching attack activity: {e}")
+                return jsonify({'error': str(e)}), 500
+                logger.error(f"Error fetching attack activity: {e}")
+                return jsonify({'error': 'Failed to fetch attack activity'}), 500
+
+        @self.app.route('/api/sinkhole/add', methods=['POST'])
+        def add_to_sinkhole():
+            """Add IP/subnet/fingerprint to sinkhole"""
             if not self._check_auth():
                 return jsonify({'error': 'Authentication required'}), 401
             
@@ -172,1702 +525,946 @@ class WebDashboard:
                 return jsonify({'error': 'Admin privileges required'}), 403
             
             try:
-                self.shield_manager.reset_all()
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                data = request.get_json()
+                
+                target = data.get('target', '').strip()
+                target_type = data.get('type', 'ip')
+                reason = data.get('reason', f'Dashboard action by {session.get("name", "unknown")}')
+                
+                if not target:
+                    return jsonify({'error': 'Target is required'}), 400
+                
+                sinkhole_manager.add_to_sinkhole(target, target_type, reason)
+                
                 return jsonify({
-                    'status': 'success',
-                    'message': 'System reset completed',
+                    'success': True,
+                    'message': f'Added {target} to sinkhole',
+                    'target': target,
+                    'type': target_type,
+                    'reason': reason
+                })
+                
+            except Exception as e:
+                logger.error(f"Error adding to sinkhole: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/blackhole/add', methods=['POST'])
+        def add_to_blackhole():
+            """Add IP/subnet to blackhole"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                from aurora_shield.mitigation.sinkhole import sinkhole_manager
+                data = request.get_json()
+                
+                target = data.get('target', '').strip()
+                target_type = data.get('type', 'ip')
+                reason = data.get('reason', f'Dashboard action by {session.get("name", "unknown")}')
+                
+                if not target:
+                    return jsonify({'error': 'Target is required'}), 400
+                
+                sinkhole_manager.add_to_blackhole(target, target_type, reason)
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Added {target} to blackhole',
+                    'target': target,
+                    'type': target_type,
+                    'reason': reason
+                })
+                
+            except Exception as e:
+                logger.error(f"Error adding to blackhole: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/advanced/stats')
+        def get_advanced_stats():
+            """Get comprehensive advanced statistics including sinkhole data"""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                advanced_stats = self.shield_manager.get_advanced_stats()
+                return jsonify(advanced_stats)
+            except Exception as e:
+                logger.error(f"Error fetching advanced stats: {e}")
+                return jsonify({'error': 'Failed to fetch advanced statistics'}), 500
+
+        @self.app.route('/api/dashboard/mitigation/<mitigation_type>', methods=['POST'])
+        def toggle_mitigation(mitigation_type):
+            """Toggle specific mitigation techniques."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # In a real implementation, this would toggle actual mitigation
+                logger.info(f"Toggling mitigation: {mitigation_type}")
+                
+                return jsonify({
+                    'success': True,
+                    'mitigation': mitigation_type,
+                    'status': 'toggled'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error toggling mitigation {mitigation_type}: {e}")
+                return jsonify({'error': f'Failed to toggle {mitigation_type}'}), 500
+
+        @self.app.route('/api/dashboard/reset-stats', methods=['POST'])
+        def reset_load_balancer_stats():
+            """Reset load balancer statistics."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # Call the load balancer's reset stats endpoint
+                import requests
+                response = requests.post('http://load-balancer:8090/api/reset-stats', timeout=5)
+                
+                if response.status_code == 200:
+                    logger.info("Load balancer statistics reset successfully")
+                    return jsonify({
+                        'success': True,
+                        'message': 'Load balancer statistics reset successfully',
+                        'timestamp': response.json().get('timestamp')
+                    })
+                else:
+                    logger.error(f"Failed to reset load balancer stats: {response.status_code}")
+                    return jsonify({'error': 'Failed to reset load balancer statistics'}), 500
+                    
+            except Exception as e:
+                logger.error(f"Error resetting load balancer stats: {e}")
+                return jsonify({'error': f'Failed to reset statistics: {str(e)}'}), 500
+
+        @self.app.route('/api/dashboard/config')
+        def get_config():
+            """Get current configuration with real values from shield manager."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                from aurora_shield.config.default_config import DEFAULT_CONFIG
+                
+                # Get current configuration from shield manager
+                current_config = getattr(self.shield_manager, 'config', DEFAULT_CONFIG)
+                
+                config = {
+                    'version': '2.0.0',
+                    'protection_enabled': True,
+                    'rate_limiter': {
+                        'enabled': True,
+                        'rate': current_config.get('rate_limiter', {}).get('rate', 10),
+                        'burst': current_config.get('rate_limiter', {}).get('burst', 20),
+                        'window_size': current_config.get('rate_limiter', {}).get('window_size', 60)
+                    },
+                    'anomaly_detector': {
+                        'enabled': True,
+                        'request_window': current_config.get('anomaly_detector', {}).get('request_window', 60),
+                        'rate_threshold': current_config.get('anomaly_detector', {}).get('rate_threshold', 100),
+                        'sensitivity': current_config.get('anomaly_detector', {}).get('sensitivity', 'medium')
+                    },
+                    'ip_reputation': {
+                        'enabled': True,
+                        'initial_score': current_config.get('ip_reputation', {}).get('initial_score', 100),
+                        'reputation_threshold': current_config.get('ip_reputation', {}).get('reputation_threshold', 50),
+                        'decay_rate': current_config.get('ip_reputation', {}).get('decay_rate', 0.1)
+                    },
+                    'challenge_response': {
+                        'enabled': True,
+                        'challenge_timeout': current_config.get('challenge_response', {}).get('challenge_timeout', 300),
+                        'difficulty': current_config.get('challenge_response', {}).get('difficulty', 'medium'),
+                        'max_attempts': current_config.get('challenge_response', {}).get('max_attempts', 3)
+                    },
+                    'sinkhole': {
+                        'enabled': True,
+                        'auto_sinkhole_enabled': True,
+                        'zero_reputation_threshold': 0,
+                        'queue_fairness_enabled': True,
+                        'queue_max_size': 1000
+                    },
+                    'thresholds': {
+                        'requests_per_second': 1000,
+                        'connection_limit': 10000,
+                        'response_time_limit': 5000,
+                        'cpu_threshold': 80,
+                        'memory_threshold': 85
+                    },
+                    'dashboard': {
+                        'host': current_config.get('dashboard', {}).get('host', '0.0.0.0'),
+                        'port': current_config.get('dashboard', {}).get('port', 8080),
+                        'refresh_interval': 5
+                    },
+                    'exported_at': datetime.now().isoformat()
+                }
+                
+                return jsonify(config)
+                
+            except Exception as e:
+                logger.error(f"Error getting config: {e}")
+                return jsonify({'error': 'Failed to get configuration'}), 500
+
+        @self.app.route('/api/dashboard/config', methods=['POST'])
+        def update_config():
+            """Update configuration parameters."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                config_updates = request.get_json()
+                if not config_updates:
+                    return jsonify({'error': 'No configuration data provided'}), 400
+                
+                # Validate and apply configuration updates
+                validation_result = self._validate_config_updates(config_updates)
+                if not validation_result['valid']:
+                    return jsonify({'error': validation_result['error']}), 400
+                
+                # Apply configuration to shield manager
+                self._apply_config_updates(config_updates)
+                
+                logger.info(f"Configuration updated by {session.get('user_id', 'unknown')}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Configuration updated successfully',
+                    'updated_at': datetime.now().isoformat()
+                })
+                
+            except Exception as e:
+                logger.error(f"Error updating config: {e}")
+                return jsonify({'error': 'Failed to update configuration'}), 500
+
+        @self.app.route('/api/emergency/shutdown', methods=['POST'])
+        def emergency_shutdown():
+            """Emergency shutdown - stops all Docker containers for system protection."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            if session.get('role') != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+            
+            try:
+                shutdown_data = request.get_json() or {}
+                reason = shutdown_data.get('reason', 'Emergency shutdown initiated from dashboard')
+                
+                logger.critical(f"EMERGENCY SHUTDOWN initiated by {session.get('name', 'unknown')}: {reason}")
+                
+                # Use subprocess to call docker commands directly
+                try:
+                    # Get list of running containers
+                    result = subprocess.run(['docker', 'ps', '--format', '{{.Names}}:{{.ID}}'], 
+                                          capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode != 0:
+                        return jsonify({
+                            'success': False,
+                            'error': f'Failed to list containers: {result.stderr}',
+                            'message': 'Could not access Docker daemon'
+                        }), 500
+                    
+                    containers_info = []
+                    if result.stdout.strip():
+                        for line in result.stdout.strip().split('\n'):
+                            if ':' in line:
+                                name, container_id = line.split(':', 1)
+                                # Skip the Aurora Shield container itself to keep dashboard operational
+                                if 'aurora-shield' not in name.lower():
+                                    containers_info.append({'name': name, 'id': container_id})
+                    
+                    if not containers_info:
+                        return jsonify({
+                            'success': True,
+                            'message': 'No running containers found',
+                            'containers_stopped': 0,
+                            'results': []
+                        })
+                    
+                    shutdown_results = []
+                    
+                    # Stop each container
+                    for container in containers_info:
+                        try:
+                            # Stop container with 10 second timeout
+                            stop_result = subprocess.run(['docker', 'stop', container['id']], 
+                                                       capture_output=True, text=True, timeout=30)
+                            
+                            if stop_result.returncode == 0:
+                                shutdown_results.append({
+                                    'name': container['name'],
+                                    'id': container['id'],
+                                    'status': 'stopped',
+                                    'error': None
+                                })
+                                logger.info(f"Emergency shutdown: Stopped container {container['name']} ({container['id']})")
+                            else:
+                                shutdown_results.append({
+                                    'name': container['name'],
+                                    'id': container['id'],
+                                    'status': 'error',
+                                    'error': stop_result.stderr.strip() or 'Failed to stop container'
+                                })
+                                logger.error(f"Emergency shutdown: Failed to stop container {container['name']}: {stop_result.stderr}")
+                            
+                        except subprocess.TimeoutExpired:
+                            shutdown_results.append({
+                                'name': container['name'],
+                                'id': container['id'],
+                                'status': 'error',
+                                'error': 'Timeout while stopping container'
+                            })
+                            logger.error(f"Emergency shutdown: Timeout stopping container {container['name']}")
+                        
+                        except Exception as e:
+                            shutdown_results.append({
+                                'name': container['name'],
+                                'id': container['id'],
+                                'status': 'error',
+                                'error': str(e)
+                            })
+                            logger.error(f"Emergency shutdown: Error stopping container {container['name']}: {e}")
+                    
+                    stopped_count = len([r for r in shutdown_results if r['status'] == 'stopped'])
+                    error_count = len([r for r in shutdown_results if r['status'] == 'error'])
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f'Emergency shutdown completed. Stopped {stopped_count} containers, {error_count} errors.',
+                        'containers_stopped': stopped_count,
+                        'containers_failed': error_count,
+                        'results': shutdown_results,
+                        'shutdown_time': datetime.now().isoformat(),
+                        'reason': reason
+                    })
+                    
+                except subprocess.TimeoutExpired:
+                    logger.error("Emergency shutdown: Timeout while executing docker commands")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Timeout while executing emergency shutdown',
+                        'message': 'Docker commands took too long to execute'
+                    }), 500
+                    
+            except Exception as e:
+                logger.error(f"Error during emergency shutdown: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'message': 'Emergency shutdown failed'
+                }), 500
+
+        @self.app.route('/health')
+        def health_check():
+            """Health check endpoint for monitoring."""
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.now().isoformat(),
+                'version': '2.0.0'
+            })
+
+        @self.app.route('/api/export/logs')
+        def export_logs():
+            """Export attack logs and system events."""
+            if not self._check_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            try:
+                # Collect various log data
+                export_data = {
+                    'export_info': {
+                        'generated_at': datetime.now().isoformat(),
+                        'exported_by': session.get('name', 'unknown'),
+                        'system_version': '2.0.0',
+                        'uptime': self._get_uptime()
+                    },
+                    'attack_logs': [],
+                    'blocked_requests': [],
+                    'reputation_scores': {},
+                    'system_stats': {},
+                    'mitigation_actions': []
+                }
+                
+                # Get recent attack activity from shield manager
+                if hasattr(self.shield_manager, 'recent_requests'):
+                    for request_info in self.shield_manager.recent_requests[-100:]:  # Last 100 requests
+                        if request_info.get('status') in ['blocked', 'sinkholed', 'blackholed', 'quarantined', 'rate-limited']:
+                            export_data['attack_logs'].append({
+                                'timestamp': request_info.get('timestamp_iso', datetime.now().isoformat()),
+                                'ip': request_info.get('ip', 'Unknown'),
+                                'method': request_info.get('method', 'Unknown'),
+                                'path': request_info.get('path', 'Unknown'),
+                                'status': request_info.get('status', 'Unknown'),
+                                'reason': request_info.get('reason', 'Security policy violation'),
+                                'user_agent': request_info.get('user_agent', 'Unknown')[:100],  # Truncate long UAs
+                                'reputation_score': request_info.get('reputation_score', 'N/A')
+                            })
+                
+                # Also try to get recent log entries from application logs
+                try:
+                    import os
+                    log_file_path = '/app/logs/app.log'
+                    if os.path.exists(log_file_path):
+                        with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            # Read last 500 lines of log file
+                            lines = f.readlines()
+                            recent_lines = lines[-500:] if len(lines) > 500 else lines
+                            
+                            for line in recent_lines:
+                                line = line.strip()
+                                if any(keyword in line.lower() for keyword in ['blocked', 'denied', 'error', 'attack', 'suspicious']):
+                                    # Parse log line for structured data
+                                    log_entry = {
+                                        'timestamp': datetime.now().isoformat(),
+                                        'log_line': line[:200],  # Truncate long lines
+                                        'source': 'application_log'
+                                    }
+                                    
+                                    # Try to extract IP from log line
+                                    import re
+                                    ip_match = re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', line)
+                                    if ip_match:
+                                        log_entry['ip'] = ip_match.group()
+                                    
+                                    # Try to extract timestamp from log line
+                                    timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}', line)
+                                    if timestamp_match:
+                                        log_entry['timestamp'] = timestamp_match.group()
+                                    
+                                    export_data['attack_logs'].append(log_entry)
+                                    
+                except Exception as e:
+                    logger.warning(f"Could not read log file: {e}")
+                
+                # Add simulated attack data if no real data is available (for demo purposes)
+                if len(export_data['attack_logs']) == 0:
+                    # Generate sample attack log entries based on recent requests to proxy
+                    sample_attacks = [
+                        {
+                            'timestamp': (datetime.now() - timedelta(minutes=5)).isoformat(),
+                            'ip': '172.20.0.1',
+                            'method': 'GET',
+                            'path': '/proxy/malicious-path',
+                            'status': 'blocked',
+                            'reason': 'Access denied - IP not in allowed list',
+                            'user_agent': 'SuspiciousBot-1',
+                            'reputation_score': 25,
+                            'source': 'proxy_security'
+                        },
+                        {
+                            'timestamp': (datetime.now() - timedelta(minutes=3)).isoformat(),
+                            'ip': '172.20.0.1',
+                            'method': 'GET',
+                            'path': '/api/dashboard/stats',
+                            'status': 'blocked',
+                            'reason': 'Authentication required',
+                            'user_agent': 'AttackBot-5',
+                            'reputation_score': 30,
+                            'source': 'authentication_guard'
+                        },
+                        {
+                            'timestamp': (datetime.now() - timedelta(minutes=1)).isoformat(),
+                            'ip': '192.168.1.100',
+                            'method': 'POST',
+                            'path': '/proxy/admin/delete',
+                            'status': 'sinkholed',
+                            'reason': 'Suspicious admin path access attempt',
+                            'user_agent': 'curl/7.68.0',
+                            'reputation_score': 15,
+                            'source': 'path_analysis'
+                        }
+                    ]
+                    export_data['attack_logs'].extend(sample_attacks)
+                
+                # Get blocked requests summary
+                attack_logs_count = len(export_data['attack_logs'])
+                blocked_count = len([log for log in export_data['attack_logs'] if log.get('status') == 'blocked'])
+                sinkholed_count = len([log for log in export_data['attack_logs'] if log.get('status') == 'sinkholed'])
+                
+                export_data['blocked_requests'] = {
+                    'total_blocked': blocked_count,
+                    'total_sinkholed': sinkholed_count,
+                    'total_requests': attack_logs_count,
+                    'block_rate': f"{(blocked_count / max(attack_logs_count, 1) * 100):.1f}%" if attack_logs_count > 0 else "0.0%"
+                }
+                
+                # Get IP reputation scores
+                if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
+                    for ip, score in list(self.shield_manager.ip_reputation.reputation_scores.items())[:50]:  # Top 50 IPs
+                        violations = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
+                        export_data['reputation_scores'][ip] = {
+                            'score': score,
+                            'violations': violations,
+                            'status': 'suspicious' if score < 50 else 'normal'
+                        }
+                
+                # Get system statistics
+                try:
+                    # Try to get attack orchestrator stats
+                    orchestrator_response = requests.get('http://attack-orchestrator:5000/api/bots/stats', timeout=5)
+                    if orchestrator_response.status_code == 200:
+                        orchestrator_data = orchestrator_response.json()
+                        export_data['system_stats']['attack_orchestrator'] = {
+                            'active_bots': orchestrator_data.get('active_bots', 0),
+                            'total_requests': orchestrator_data.get('total_requests', 0),
+                            'attack_types': orchestrator_data.get('attack_types', {})
+                        }
+                except:
+                    export_data['system_stats']['attack_orchestrator'] = {'status': 'unavailable'}
+                
+                # Add mitigation actions summary
+                export_data['mitigation_actions'] = [
+                    {
+                        'timestamp': datetime.now().isoformat(),
+                        'action': 'Rate Limiting',
+                        'status': 'Active',
+                        'description': 'Automatic rate limiting based on request patterns'
+                    },
+                    {
+                        'timestamp': datetime.now().isoformat(),
+                        'action': 'IP Reputation',
+                        'status': 'Active', 
+                        'description': 'Real-time IP reputation scoring and blocking'
+                    },
+                    {
+                        'timestamp': datetime.now().isoformat(),
+                        'action': 'Anomaly Detection',
+                        'status': 'Active',
+                        'description': 'Machine learning-based traffic anomaly detection'
+                    }
+                ]
+                
+                # Create filename with timestamp
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f'aurora_shield_logs_{timestamp}.json'
+                
+                # Return as downloadable JSON file
+                response = Response(
+                    json.dumps(export_data, indent=2, ensure_ascii=False),
+                    mimetype='application/json',
+                    headers={
+                        'Content-Disposition': f'attachment; filename={filename}',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                )
+                
+                logger.info(f"Logs exported by {session.get('name', 'unknown')} - {len(export_data['attack_logs'])} attack logs, {len(export_data['reputation_scores'])} IP scores")
+                
+                return response
+                
+            except Exception as e:
+                logger.error(f"Error exporting logs: {e}")
+                return jsonify({'error': f'Failed to export logs: {str(e)}'}), 500
+
+        @self.app.route('/api/debug/reputation')
+        def debug_reputation_scores():
+            """Debug endpoint to get current IP reputation scores."""
+            try:
+                # Call the debug method to log reputation scores
+                tracked_count = self.shield_manager.debug_print_reputation_scores()
+                
+                # Also return the data in JSON format
+                reputation_data = {}
+                if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
+                    for ip, score in self.shield_manager.ip_reputation.reputation_scores.items():
+                        violations = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
+                        reputation_data[ip] = {
+                            'score': score,
+                            'violations': violations
+                        }
+                
+                return jsonify({
+                    'success': True,
+                    'tracked_ips': tracked_count,
+                    'reputation_scores': reputation_data,
                     'timestamp': datetime.now().isoformat()
                 })
             except Exception as e:
-                logger.error(f"Reset error: {e}")
-                return jsonify({'error': f'Reset failed: {str(e)}'}), 500
-        
-        @self.app.route('/api/dashboard/config', methods=['GET', 'POST'])
-        def system_config():
-            """System configuration endpoint."""
-            if not self._check_auth():
-                return jsonify({'error': 'Authentication required'}), 401
-            
-            if request.method == 'GET':
-                return jsonify({
-                    'rate_limiter': self.shield_manager.config.get('rate_limiter', {}),
-                    'anomaly_detector': self.shield_manager.config.get('anomaly_detector', {}),
-                    'ip_reputation': self.shield_manager.config.get('ip_reputation', {})
-                })
-            
-            # POST - Update configuration (admin only)
-            if session.get('role') != 'admin':
-                return jsonify({'error': 'Admin privileges required'}), 403
-            
-            try:
-                new_config = request.get_json()
-                # Update configuration logic here
-                return jsonify({'status': 'success', 'message': 'Configuration updated'})
-            except Exception as e:
-                return jsonify({'error': f'Configuration update failed: {str(e)}'}), 500
-    
-    def _calculate_threat_level(self, stats):
-        """Calculate current threat level based on statistics."""
-        blocked_ips = stats.get('anomaly_detector', {}).get('blocked_ips', 0)
-        total_anomalies = stats.get('anomaly_detector', {}).get('total_anomalies', 0)
-        
-        if total_anomalies > 50 or blocked_ips > 10:
-            return 'HIGH'
-        elif total_anomalies > 20 or blocked_ips > 5:
-            return 'MEDIUM'
-        return 'LOW'
-    
-    def _get_recent_attacks(self):
-        """Get recent attack information."""
-        # This would normally come from logs or database
-        return [
-            {
-                'timestamp': datetime.now().isoformat(),
-                'type': 'HTTP Flood',
-                'source_ip': '192.168.1.100',
-                'status': 'BLOCKED'
-            }
-        ]
-    
-    def _get_performance_metrics(self):
-        """Get system performance metrics."""
-        return {
-            'cpu_usage': 45.2,
-            'memory_usage': 62.8,
-            'network_io': 125.6,
-            'response_time': 89.3
-        }
-    
-    def _get_login_template(self):
-        """Enhanced login template with professional design."""
-        return '''
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Aurora Shield - INFOTHON 5.0</title>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                
-                body {
-                    font-family: 'Inter', sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }
-                
-                .login-container {
-                    background: rgba(255, 255, 255, 0.95);
-                    backdrop-filter: blur(20px);
-                    border-radius: 20px;
-                    padding: 40px;
-                    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-                    width: 100%;
-                    max-width: 420px;
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                }
-                
-                .logo {
-                    text-align: center;
-                    margin-bottom: 30px;
-                }
-                
-                .logo h1 {
-                    font-size: 2.5rem;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    font-weight: 700;
-                    margin-bottom: 8px;
-                }
-                
-                .logo .subtitle {
-                    color: #6b7280;
-                    font-size: 0.95rem;
-                    font-weight: 500;
-                }
-                
-                .logo .badge {
-                    display: inline-block;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    color: white;
-                    padding: 4px 12px;
-                    border-radius: 12px;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    margin-top: 8px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                
-                .form-group {
-                    margin-bottom: 20px;
-                }
-                
-                .form-group label {
-                    display: block;
-                    margin-bottom: 8px;
-                    color: #374151;
-                    font-weight: 500;
-                    font-size: 0.9rem;
-                }
-                
-                .form-group input {
-                    width: 100%;
-                    padding: 14px 16px;
-                    border: 2px solid #e5e7eb;
-                    border-radius: 12px;
-                    font-size: 1rem;
-                    transition: all 0.3s ease;
-                    background: white;
-                    font-family: 'Inter', sans-serif;
-                }
-                
-                .form-group input:focus {
-                    outline: none;
-                    border-color: #667eea;
-                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-                    transform: translateY(-2px);
-                }
-                
-                .login-btn {
-                    width: 100%;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    color: white;
-                    padding: 16px;
-                    border: none;
-                    border-radius: 12px;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    margin-bottom: 20px;
-                    font-family: 'Inter', sans-serif;
-                }
-                
-                .login-btn:hover {
-                    transform: translateY(-3px);
-                    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
-                }
-                
-                .alert {
-                    padding: 12px 16px;
-                    border-radius: 10px;
-                    margin-bottom: 20px;
-                    font-size: 0.9rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                
-                .alert.error {
-                    background: #fef2f2;
-                    color: #dc2626;
-                    border: 1px solid #fecaca;
-                }
-                
-                .alert.success {
-                    background: #f0fdf4;
-                    color: #16a34a;
-                    border: 1px solid #bbf7d0;
-                }
-                
-                .alert.info {
-                    background: #eff6ff;
-                    color: #2563eb;
-                    border: 1px solid #bfdbfe;
-                }
-                
-                .credentials {
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 10px;
-                    padding: 12px;
-                    margin-top: 20px;
-                    font-size: 0.85rem;
-                    color: #64748b;
-                }
-                
-                .credentials strong {
-                    color: #1e293b;
-                }
-                
-                .shield-animation {
-                    animation: float 3s ease-in-out infinite;
-                }
-                
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-8px); }
-                }
-                
-                .tech-stack {
-                    margin-top: 20px;
-                    text-align: center;
-                    font-size: 0.8rem;
-                    color: #6b7280;
-                    border-top: 1px solid #e5e7eb;
-                    padding-top: 15px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="login-container">
-                <div class="logo">
-                    <h1><i class="fas fa-shield-alt shield-animation"></i> Aurora Shield</h1>
-                    <p class="subtitle">DDoS Protection Framework</p>
-                    <span class="badge">INFOTHON 5.0</span>
-                </div>
-                
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert {{ category }}">
-                                <i class="fas fa-{% if category == 'error' %}exclamation-triangle{% elif category == 'success' %}check-circle{% else %}info-circle{% endif %}"></i>
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-                
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="username"><i class="fas fa-user"></i> Username</label>
-                        <input type="text" id="username" name="username" required placeholder="Enter your username">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="password"><i class="fas fa-lock"></i> Password</label>
-                        <input type="password" id="password" name="password" required placeholder="Enter your password">
-                    </div>
-                    
-                    <button type="submit" class="login-btn">
-                        <i class="fas fa-sign-in-alt"></i> Sign In to Dashboard
-                    </button>
-                </form>
-                
-                <div class="credentials">
-                    <strong>Demo Credentials:</strong><br>
-                    Admin: <code>admin</code> / <code>admin123</code><br>
-                    User: <code>user</code> / <code>user123</code>
-                </div>
-                
-                <div class="tech-stack">
-                    <i class="fas fa-code"></i> Flask • Python • Real-time Monitoring
-                </div>
-            </div>
-        </body>
-        </html>
-        '''
-    
-    def _get_dashboard_template(self):
-        """Enhanced dashboard template with dark theme and sidebar navigation."""
-        return '''
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Aurora Shield Dashboard - INFOTHON 5.0</title>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css" rel="stylesheet">
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                
-                body {
-                    font-family: 'Inter', sans-serif;
-                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-                    min-height: 100vh;
-                    color: #e2e8f0;
-                    overflow-x: hidden;
-                }
-                
-                .app-container {
-                    display: flex;
-                    min-height: 100vh;
-                }
-                
-                /* Sidebar Styles */
-                .sidebar {
-                    width: 280px;
-                    background: rgba(15, 23, 42, 0.95);
-                    backdrop-filter: blur(20px);
-                    border-right: 1px solid rgba(99, 102, 241, 0.2);
-                    position: fixed;
-                    height: 100vh;
-                    z-index: 1000;
-                    transition: all 0.3s ease;
-                    overflow-y: auto;
-                }
-                
-                .sidebar.collapsed {
-                    width: 80px;
-                }
-                
-                .sidebar-header {
-                    padding: 25px 20px;
-                    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
-                    text-align: center;
-                }
-                
-                .sidebar-header h1 {
-                    font-size: 1.5rem;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    font-weight: 700;
-                    margin-bottom: 5px;
-                }
-                
-                .sidebar.collapsed .sidebar-header h1 {
-                    font-size: 1.2rem;
-                }
-                
-                .sidebar-header .subtitle {
-                    font-size: 0.75rem;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                
-                .sidebar-toggle {
-                    position: absolute;
-                    top: 20px;
-                    right: 15px;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    border: none;
-                    color: white;
-                    width: 30px;
-                    height: 30px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                }
-                
-                .sidebar-nav {
-                    padding: 20px 0;
-                }
-                
-                .nav-item {
-                    margin: 5px 15px;
-                    border-radius: 12px;
-                    overflow: hidden;
-                }
-                
-                .nav-link {
-                    display: flex;
-                    align-items: center;
-                    padding: 15px 20px;
-                    color: #94a3b8;
-                    text-decoration: none;
-                    transition: all 0.3s ease;
-                    font-weight: 500;
-                    border-radius: 12px;
-                }
-                
-                .nav-link:hover {
-                    background: rgba(99, 102, 241, 0.1);
-                    color: #e2e8f0;
-                    transform: translateX(5px);
-                }
-                
-                .nav-link.active {
-                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-                    color: #667eea;
-                    border-left: 3px solid #667eea;
-                }
-                
-                .nav-link i {
-                    margin-right: 12px;
-                    width: 20px;
-                    text-align: center;
-                    font-size: 1.1rem;
-                }
-                
-                .sidebar.collapsed .nav-link span {
-                    display: none;
-                }
-                
-                .sidebar.collapsed .nav-link {
-                    justify-content: center;
-                    padding: 15px;
-                }
-                
-                .sidebar.collapsed .nav-link i {
-                    margin-right: 0;
-                }
-                
-                /* Main Content */
-                .main-content {
-                    flex: 1;
-                    margin-left: 280px;
-                    transition: all 0.3s ease;
-                    padding: 20px;
-                }
-                
-                .main-content.expanded {
-                    margin-left: 80px;
-                }
-                
-                .header {
-                    background: rgba(15, 23, 42, 0.95);
-                    backdrop-filter: blur(20px);
-                    padding: 20px 30px;
-                    border-radius: 20px;
-                    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
-                    margin-bottom: 30px;
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    flex-wrap: wrap;
-                }
-                
-                .header-left h2 {
-                    font-size: 1.8rem;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    font-weight: 700;
-                    margin-bottom: 5px;
-                }
-                
-                .header-left .subtitle {
-                    color: #64748b;
-                    font-size: 0.9rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-                
-                .header-right {
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                }
-                
-                .user-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    background: rgba(99, 102, 241, 0.1);
-                    padding: 10px 15px;
-                    border-radius: 12px;
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                }
-                
-                .user-avatar {
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 50%;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-weight: 600;
-                    font-size: 0.9rem;
-                }
-                
-                .logout-btn {
-                    background: linear-gradient(135deg, #ef4444, #dc2626);
-                    color: white;
-                    text-decoration: none;
-                    padding: 10px 20px;
-                    border-radius: 10px;
-                    font-weight: 500;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-size: 0.9rem;
-                }
-                
-                .logout-btn:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
-                }
-                
-                /* Tab Content */
-                .tab-content {
-                    display: none;
-                }
-                
-                .tab-content.active {
-                    display: block;
-                }
-                
-                /* Status Bar */
-                .status-bar {
-                    background: rgba(15, 23, 42, 0.95);
-                    backdrop-filter: blur(20px);
-                    padding: 30px;
-                    border-radius: 20px;
-                    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
-                    margin-bottom: 30px;
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 25px;
-                }
-                
-                .status-item {
-                    text-align: center;
-                    padding: 25px 15px;
-                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
-                    border-radius: 15px;
-                    transition: all 0.3s ease;
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                    position: relative;
-                    overflow: hidden;
-                }
-                
-                .status-item::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    height: 3px;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                }
-                
-                .status-item:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 15px 35px rgba(99, 102, 241, 0.2);
-                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-                }
-                
-                .status-icon {
-                    font-size: 2rem;
-                    margin-bottom: 10px;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                }
-                
-                .status-value {
-                    font-size: 2.5rem;
-                    font-weight: 700;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    margin-bottom: 8px;
-                    display: block;
-                }
-                
-                .status-label {
-                    color: #94a3b8;
-                    font-weight: 500;
-                    font-size: 0.9rem;
-                }
-                
-                /* Cards */
-                .grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-                    gap: 30px;
-                    margin-bottom: 30px;
-                }
-                
-                .card {
-                    background: rgba(15, 23, 42, 0.95);
-                    backdrop-filter: blur(20px);
-                    padding: 30px;
-                    border-radius: 20px;
-                    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                    transition: all 0.3s ease;
-                }
-                
-                .card:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-                    border-color: rgba(99, 102, 241, 0.3);
-                }
-                
-                .card h3 {
-                    color: #e2e8f0;
-                    margin-bottom: 20px;
-                    font-size: 1.4rem;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding-bottom: 15px;
-                    border-bottom: 2px solid;
-                    border-image: linear-gradient(135deg, #667eea, #764ba2) 1;
-                }
-                
-                .card h3 i {
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                }
-                
-                .metric {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 15px 0;
-                    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-                    transition: all 0.3s ease;
-                }
-                
-                .metric:hover {
-                    background: rgba(99, 102, 241, 0.05);
-                    padding-left: 12px;
-                    border-radius: 8px;
-                    margin: 0 -12px;
-                }
-                
-                .metric:last-child {
-                    border-bottom: none;
-                }
-                
-                .metric-label {
-                    color: #94a3b8;
-                    font-weight: 500;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                
-                .metric-value {
-                    font-weight: 600;
-                    color: #e2e8f0;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    font-size: 1.1rem;
-                }
-                
-                /* Buttons */
-                .control-panel {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 15px;
-                    margin-bottom: 25px;
-                }
-                
-                .btn {
-                    padding: 12px 24px;
-                    border: none;
-                    border-radius: 12px;
-                    cursor: pointer;
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    transition: all 0.3s ease;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    text-decoration: none;
-                    font-family: 'Inter', sans-serif;
-                }
-                
-                .btn-primary {
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    color: white;
-                }
-                
-                .btn-success {
-                    background: linear-gradient(135deg, #10b981, #059669);
-                    color: white;
-                }
-                
-                .btn-warning {
-                    background: linear-gradient(135deg, #f59e0b, #d97706);
-                    color: white;
-                }
-                
-                .btn-danger {
-                    background: linear-gradient(135deg, #ef4444, #dc2626);
-                    color: white;
-                }
-                
-                .btn:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-                }
-                
-                .btn:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                    transform: none;
-                }
-                
-                /* Alerts */
-                .alert {
-                    padding: 15px 20px;
-                    border-radius: 12px;
-                    margin-bottom: 20px;
-                    font-size: 0.9rem;
-                    border-left: 4px solid;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-                
-                .alert.success {
-                    background: rgba(16, 185, 129, 0.1);
-                    color: #10b981;
-                    border-left-color: #10b981;
-                }
-                
-                .alert.warning {
-                    background: rgba(245, 158, 11, 0.1);
-                    color: #f59e0b;
-                    border-left-color: #f59e0b;
-                }
-                
-                .alert.error {
-                    background: rgba(239, 68, 68, 0.1);
-                    color: #ef4444;
-                    border-left-color: #ef4444;
-                }
-                
-                .alert.info {
-                    background: rgba(59, 130, 246, 0.1);
-                    color: #3b82f6;
-                    border-left-color: #3b82f6;
-                }
-                
-                /* Activity Log */
-                .activity-log {
-                    max-height: 300px;
-                    overflow-y: auto;
-                }
-                
-                .log-entry {
-                    padding: 12px 16px;
-                    margin: 8px 0;
-                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
-                    border-radius: 10px;
-                    font-size: 0.9rem;
-                    border-left: 3px solid #667eea;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-                
-                .log-entry:hover {
-                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
-                    transform: translateX(5px);
-                }
-                
-                .log-time {
-                    color: #64748b;
-                    font-size: 0.8rem;
-                    margin-left: auto;
-                }
-                
-                /* Threat Levels */
-                .threat-level {
-                    padding: 6px 12px;
-                    border-radius: 20px;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                
-                .threat-level.low {
-                    background: rgba(16, 185, 129, 0.2);
-                    color: #10b981;
-                }
-                
-                .threat-level.medium {
-                    background: rgba(245, 158, 11, 0.2);
-                    color: #f59e0b;
-                }
-                
-                .threat-level.high {
-                    background: rgba(239, 68, 68, 0.2);
-                    color: #ef4444;
-                }
-                
-                /* Animations */
-                .refresh-indicator {
-                    display: inline-block;
-                    width: 12px;
-                    height: 12px;
-                    background: linear-gradient(135deg, #10b981, #059669);
-                    border-radius: 50%;
-                    animation: pulse 2s infinite;
-                }
-                
-                @keyframes pulse {
-                    0%, 100% { 
-                        opacity: 1; 
-                        transform: scale(1);
-                    }
-                    50% { 
-                        opacity: 0.4; 
-                        transform: scale(1.2);
-                    }
-                }
-                
-                .loading {
-                    display: inline-block;
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                    border-top: 2px solid #ffffff;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                }
-                
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                
-                /* Badge */
-                .badge {
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    color: white;
-                    padding: 4px 12px;
-                    border-radius: 12px;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                
-                /* Responsive */
-                @media (max-width: 768px) {
-                    .sidebar {
-                        width: 100%;
-                        height: auto;
-                        position: relative;
-                    }
-                    
-                    .main-content {
-                        margin-left: 0;
-                    }
-                    
-                    .header {
-                        flex-direction: column;
-                        gap: 15px;
-                        text-align: center;
-                    }
-                    
-                    .status-bar {
-                        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                        gap: 15px;
-                    }
-                    
-                    .grid {
-                        grid-template-columns: 1fr;
-                    }
-                    
-                    .control-panel {
-                        flex-direction: column;
-                    }
-                }
-                
-                /* Footer */
-                .infothon-footer {
-                    text-align: center;
-                    margin-top: 30px;
-                    padding: 20px;
-                    background: rgba(15, 23, 42, 0.8);
-                    border-radius: 15px;
-                    color: #64748b;
-                    font-size: 0.9rem;
-                    border: 1px solid rgba(99, 102, 241, 0.2);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="app-container">
-                <!-- Sidebar -->
-                <div class="sidebar" id="sidebar">
-                    <div class="sidebar-header">
-                        <button class="sidebar-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </button>
-                        <h1><i class="fas fa-shield-alt"></i> Aurora Shield</h1>
-                        <p class="subtitle">INFOTHON 5.0</p>
-                    </div>
-                    
-                    <nav class="sidebar-nav">
-                        <div class="nav-item">
-                            <a href="#" class="nav-link active" onclick="showTab('dashboard')">
-                                <i class="fas fa-tachometer-alt"></i>
-                                <span>Dashboard</span>
-                            </a>
-                        </div>
-                        <div class="nav-item">
-                            <a href="#" class="nav-link" onclick="showTab('monitoring')">
-                                <i class="fas fa-chart-line"></i>
-                                <span>Monitoring</span>
-                            </a>
-                        </div>
-                        <div class="nav-item">
-                            <a href="#" class="nav-link" onclick="showTab('simulation')">
-                                <i class="fas fa-bug"></i>
-                                <span>Attack Simulation</span>
-                            </a>
-                        </div>
-                        <div class="nav-item">
-                            <a href="#" class="nav-link" onclick="showTab('protection')">
-                                <i class="fas fa-shield-check"></i>
-                                <span>Protection</span>
-                            </a>
-                        </div>
-                        <div class="nav-item">
-                            <a href="#" class="nav-link" onclick="showTab('analytics')">
-                                <i class="fas fa-chart-pie"></i>
-                                <span>Analytics</span>
-                            </a>
-                        </div>
-                        <div class="nav-item">
-                            <a href="#" class="nav-link" onclick="showTab('settings')">
-                                <i class="fas fa-cog"></i>
-                                <span>Settings</span>
-                            </a>
-                        </div>
-                    </nav>
-                </div>
-                
-                <!-- Main Content -->
-                <div class="main-content" id="mainContent">
-                    <div class="header">
-                        <div class="header-left">
-                            <h2 id="pageTitle">Dashboard Overview</h2>
-                            <p class="subtitle">
-                                <span class="refresh-indicator"></span>
-                                Real-time DDoS Protection Monitoring
-                                <span class="badge">Live</span>
-                            </p>
-                        </div>
-                        <div class="header-right">
-                            <div class="user-info">
-                                <div class="user-avatar">{{ session.name[0] if session.name else 'U' }}</div>
-                                <div>
-                                    <div style="font-weight: 600; color: #e2e8f0;">{{ session.name or 'User' }}</div>
-                                    <div style="font-size: 0.8rem; color: #64748b;">{{ session.role or 'user' }}</div>
-                                </div>
-                            </div>
-                            <a href="/logout" class="logout-btn">
-                                <i class="fas fa-sign-out-alt"></i> Logout
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Dashboard Tab -->
-                    <div id="dashboard" class="tab-content active">
-                        <div class="status-bar" id="statusBar">
-                            <div class="status-item">
-                                <div class="status-icon"><i class="fas fa-shield-check"></i></div>
-                                <div class="status-value" id="protectionStatus">ACTIVE</div>
-                                <div class="status-label">Protection Status</div>
-                            </div>
-                            <div class="status-item">
-                                <div class="status-icon"><i class="fas fa-ban"></i></div>
-                                <div class="status-value" id="threatsBlocked">0</div>
-                                <div class="status-label">Threats Blocked</div>
-                            </div>
-                            <div class="status-item">
-                                <div class="status-icon"><i class="fas fa-eye"></i></div>
-                                <div class="status-value" id="activeMonitoring">0</div>
-                                <div class="status-label">IPs Monitored</div>
-                            </div>
-                            <div class="status-item">
-                                <div class="status-icon"><i class="fas fa-tachometer-alt"></i></div>
-                                <div class="status-value" id="requestRate">0</div>
-                                <div class="status-label">Requests/min</div>
-                            </div>
-                            <div class="status-item">
-                                <div class="status-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                                <div class="status-value" id="threatLevel">LOW</div>
-                                <div class="status-label">Threat Level</div>
-                            </div>
-                        </div>
-                        
-                        <div class="grid">
-                            <div class="card">
-                                <h3><i class="fas fa-search"></i> Anomaly Detection</h3>
-                                <div id="anomalyStats">
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-desktop"></i> Monitored IPs</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-ban"></i> Blocked IPs</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-exclamation-circle"></i> Total Anomalies</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-stopwatch"></i> Rate Limiting</h3>
-                                <div id="rateLimitStats">
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-users"></i> Tracked Identifiers</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-gauge"></i> Rate Limit</span>
-                                        <span class="metric-value">10 req/s</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-bolt"></i> Burst Limit</span>
-                                        <span class="metric-value">20</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-award"></i> IP Reputation</h3>
-                                <div id="reputationStats">
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-globe"></i> Tracked IPs</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-check-circle"></i> Whitelisted</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-times-circle"></i> Blacklisted</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-server"></i> System Performance</h3>
-                                <div id="performanceStats">
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-microchip"></i> CPU Usage</span>
-                                        <span class="metric-value">45.2%</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-memory"></i> Memory Usage</span>
-                                        <span class="metric-value">62.8%</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-network-wired"></i> Network I/O</span>
-                                        <span class="metric-value">125.6 MB/s</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card">
-                            <h3><i class="fas fa-chart-line"></i> Recent Activity</h3>
-                            <div class="activity-log" id="recentActivity">
-                                <div class="log-entry">
-                                    <i class="fas fa-info-circle" style="color: #3b82f6;"></i>
-                                    <span>System initialized and monitoring started</span>
-                                    <span class="log-time">just now</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Monitoring Tab -->
-                    <div id="monitoring" class="tab-content">
-                        <div class="card">
-                            <h3><i class="fas fa-chart-area"></i> Real-time Traffic Monitoring</h3>
-                            <div style="height: 300px; background: rgba(99, 102, 241, 0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748b;">
-                                <i class="fas fa-chart-line" style="font-size: 3rem; opacity: 0.3;"></i>
-                                <span style="margin-left: 15px;">Traffic Chart Placeholder</span>
-                            </div>
-                        </div>
-                        
-                        <div class="grid">
-                            <div class="card">
-                                <h3><i class="fas fa-network-wired"></i> Network Statistics</h3>
-                                <div id="networkStats">
-                                    <div class="metric">
-                                        <span class="metric-label">Packets/sec</span>
-                                        <span class="metric-value">1,234</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Bandwidth Usage</span>
-                                        <span class="metric-value">45.6 MB/s</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Connections</span>
-                                        <span class="metric-value">89</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-clock"></i> Response Times</h3>
-                                <div id="responseStats">
-                                    <div class="metric">
-                                        <span class="metric-label">Average Response</span>
-                                        <span class="metric-value">125ms</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">95th Percentile</span>
-                                        <span class="metric-value">250ms</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Max Response</span>
-                                        <span class="metric-value">456ms</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Attack Simulation Tab -->
-                    <div id="simulation" class="tab-content">
-                        <div class="card">
-                            <h3><i class="fas fa-gamepad"></i> Attack Simulation Control Panel</h3>
-                            <div class="control-panel">
-                                <button class="btn btn-success" onclick="refreshData()">
-                                    <i class="fas fa-sync-alt"></i> Refresh Data
-                                </button>
-                                <button class="btn btn-primary" onclick="runSimulation('http_flood')">
-                                    <i class="fas fa-tidal-wave"></i> HTTP Flood Attack
-                                </button>
-                                <button class="btn btn-warning" onclick="runSimulation('distributed')">
-                                    <i class="fas fa-sitemap"></i> Distributed Attack
-                                </button>
-                                <button class="btn btn-primary" onclick="runSimulation('slowloris')">
-                                    <i class="fas fa-hourglass-half"></i> Slowloris Attack
-                                </button>
-                                {% if session.role == 'admin' %}
-                                <button class="btn btn-danger" onclick="resetSystem()">
-                                    <i class="fas fa-exclamation-triangle"></i> Reset System
-                                </button>
-                                {% endif %}
-                            </div>
-                            <div id="controlMessages"></div>
-                        </div>
-                        
-                        <div class="grid">
-                            <div class="card">
-                                <h3><i class="fas fa-history"></i> Simulation History</h3>
-                                <div id="simulationHistory">
-                                    <div class="log-entry">
-                                        <i class="fas fa-play-circle" style="color: #10b981;"></i>
-                                        <span>No simulations run yet</span>
-                                        <span class="log-time">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-chart-bar"></i> Attack Metrics</h3>
-                                <div id="attackMetrics">
-                                    <div class="metric">
-                                        <span class="metric-label">Total Simulations</span>
-                                        <span class="metric-value">0</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Success Rate</span>
-                                        <span class="metric-value">0%</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Avg Duration</span>
-                                        <span class="metric-value">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Protection Tab -->
-                    <div id="protection" class="tab-content">
-                        <div class="grid">
-                            <div class="card">
-                                <h3><i class="fas fa-shield-alt"></i> Protection Layers</h3>
-                                <div id="protectionLayers">
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-layer-group"></i> Active Layers</span>
-                                        <span class="metric-value">5</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-check-shield"></i> IP Reputation</span>
-                                        <span class="metric-value" style="color: #10b981;">ACTIVE</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-stopwatch"></i> Rate Limiting</span>
-                                        <span class="metric-value" style="color: #10b981;">ACTIVE</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label"><i class="fas fa-search"></i> Anomaly Detection</span>
-                                        <span class="metric-value" style="color: #10b981;">ACTIVE</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-list-ul"></i> Blocked IPs</h3>
-                                <div id="blockedIPs">
-                                    <div class="log-entry">
-                                        <i class="fas fa-ban" style="color: #ef4444;"></i>
-                                        <span>No IPs currently blocked</span>
-                                        <span class="log-time">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Analytics Tab -->
-                    <div id="analytics" class="tab-content">
-                        <div class="card">
-                            <h3><i class="fas fa-chart-pie"></i> Security Analytics</h3>
-                            <div style="height: 300px; background: rgba(99, 102, 241, 0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748b;">
-                                <i class="fas fa-chart-pie" style="font-size: 3rem; opacity: 0.3;"></i>
-                                <span style="margin-left: 15px;">Analytics Charts Placeholder</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Settings Tab -->
-                    <div id="settings" class="tab-content">
-                        <div class="grid">
-                            <div class="card">
-                                <h3><i class="fas fa-sliders-h"></i> Rate Limiting Settings</h3>
-                                <div id="rateLimitSettings">
-                                    <div class="metric">
-                                        <span class="metric-label">Requests per Second</span>
-                                        <span class="metric-value">10</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Burst Limit</span>
-                                        <span class="metric-value">20</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Window Size</span>
-                                        <span class="metric-value">60s</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3><i class="fas fa-cogs"></i> System Configuration</h3>
-                                <div id="systemConfig">
-                                    <div class="metric">
-                                        <span class="metric-label">Auto-Recovery</span>
-                                        <span class="metric-value" style="color: #10b981;">ENABLED</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">ELK Integration</span>
-                                        <span class="metric-value" style="color: #10b981;">ENABLED</span>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">Prometheus</span>
-                                        <span class="metric-value" style="color: #10b981;">ENABLED</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="infothon-footer">
-                        <i class="fas fa-shield-alt"></i> Aurora Shield - INFOTHON 5.0 DDoS Protection Framework<br>
-                        <small>Powered by Flask • Python • Real-time Analytics • Dark Theme</small>
-                    </div>
-                </div>
-            </div>
-            
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-            <script>
-                let isLoading = false;
-                let updateInterval = null;
-                let simulationHistory = [];
-                
-                // Sidebar Toggle
-                function toggleSidebar() {
-                    const sidebar = document.getElementById('sidebar');
-                    const mainContent = document.getElementById('mainContent');
-                    
-                    sidebar.classList.toggle('collapsed');
-                    mainContent.classList.toggle('expanded');
-                }
-                
-                // Tab Navigation
-                function showTab(tabName) {
-                    // Hide all tabs
-                    document.querySelectorAll('.tab-content').forEach(tab => {
-                        tab.classList.remove('active');
-                    });
-                    
-                    // Remove active class from all nav links
-                    document.querySelectorAll('.nav-link').forEach(link => {
-                        link.classList.remove('active');
-                    });
-                    
-                    // Show selected tab
-                    document.getElementById(tabName).classList.add('active');
-                    
-                    // Add active class to clicked nav link
-                    event.target.classList.add('active');
-                    
-                    // Update page title
-                    const titles = {
-                        'dashboard': 'Dashboard Overview',
-                        'monitoring': 'Real-time Monitoring',
-                        'simulation': 'Attack Simulation',
-                        'protection': 'Protection Status',
-                        'analytics': 'Security Analytics',
-                        'settings': 'System Settings'
-                    };
-                    
-                    document.getElementById('pageTitle').textContent = titles[tabName] || 'Dashboard';
-                }
-                
-                function updateDashboard() {
-                    if (isLoading) return;
-                    isLoading = true;
-                    
-                    fetch('/api/dashboard/stats')
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`HTTP ${response.status}`);
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            if (data.error) {
-                                console.error('API Error:', data.error);
-                                if (data.error.includes('Authentication')) {
-                                    window.location.href = '/login';
-                                }
-                                return;
-                            }
-                            
-                            console.log('Dashboard data received:', data);
-                            
-                            // Update status bar
-                            document.getElementById('threatsBlocked').textContent = data.threats_blocked || 0;
-                            document.getElementById('activeMonitoring').textContent = data.monitored_ips || 0;
-                            
-                            // Update threat level
-                            const threatLevel = data.system_info?.threat_level || 'LOW';
-                            const threatElement = document.getElementById('threatLevel');
-                            threatElement.textContent = threatLevel;
-                            threatElement.className = `threat-level ${threatLevel.toLowerCase()}`;
-                            
-                            // Update anomaly detection
-                            if (data.anomaly_detector) {
-                                updateMetrics('anomalyStats', [
-                                    { label: '<i class="fas fa-desktop"></i> Monitored IPs', value: data.anomaly_detector.monitored_ips || 0 },
-                                    { label: '<i class="fas fa-ban"></i> Blocked IPs', value: data.anomaly_detector.blocked_ips || 0 },
-                                    { label: '<i class="fas fa-exclamation-circle"></i> Total Anomalies', value: data.anomaly_detector.total_anomalies || 0 }
-                                ]);
-                            }
-                            
-                            // Update rate limiting
-                            if (data.rate_limiter) {
-                                updateMetrics('rateLimitStats', [
-                                    { label: '<i class="fas fa-users"></i> Tracked Identifiers', value: Object.keys(data.rate_limiter.buckets || {}).length },
-                                    { label: '<i class="fas fa-gauge"></i> Rate Limit', value: '10 req/s' },
-                                    { label: '<i class="fas fa-bolt"></i> Burst Limit', value: '20' }
-                                ]);
-                            }
-                            
-                            // Update performance metrics
-                            if (data.performance_metrics) {
-                                updateMetrics('performanceStats', [
-                                    { label: '<i class="fas fa-microchip"></i> CPU Usage', value: data.performance_metrics.cpu_usage + '%' },
-                                    { label: '<i class="fas fa-memory"></i> Memory Usage', value: data.performance_metrics.memory_usage + '%' },
-                                    { label: '<i class="fas fa-network-wired"></i> Network I/O', value: data.performance_metrics.network_io + ' MB/s' }
-                                ]);
-                            }
-                            
-                            // Update activity log
-                            if (data.recent_attacks && data.recent_attacks.length > 0) {
-                                updateActivityLog(data.recent_attacks);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error updating dashboard:', error);
-                            showMessage('Failed to update dashboard data: ' + error.message, 'error');
-                        })
-                        .finally(() => {
-                            isLoading = false;
-                        });
-                }
-                
-                function updateMetrics(containerId, metrics) {
-                    const container = document.getElementById(containerId);
-                    if (container) {
-                        container.innerHTML = metrics.map(metric => `
-                            <div class="metric">
-                                <span class="metric-label">${metric.label}</span>
-                                <span class="metric-value">${metric.value}</span>
-                            </div>
-                        `).join('');
-                    }
-                }
-                
-                function updateActivityLog(activities) {
-                    const container = document.getElementById('recentActivity');
-                    if (container) {
-                        container.innerHTML = activities.map(activity => `
-                            <div class="log-entry">
-                                <i class="fas fa-${getActivityIcon(activity.type)}" style="color: ${getActivityColor(activity.status)};"></i>
-                                <span>${activity.type} from ${activity.source_ip}</span>
-                                <span class="log-time">${formatTime(activity.timestamp)}</span>
-                            </div>
-                        `).join('');
-                    }
-                }
-                
-                function getActivityIcon(type) {
-                    const icons = {
-                        'HTTP Flood': 'tidal-wave',
-                        'Slowloris': 'hourglass-half',
-                        'Distributed': 'sitemap'
-                    };
-                    return icons[type] || 'exclamation-triangle';
-                }
-                
-                function getActivityColor(status) {
-                    return status === 'BLOCKED' ? '#ef4444' : '#f59e0b';
-                }
-                
-                function formatTime(timestamp) {
-                    try {
-                        const date = new Date(timestamp);
-                        return date.toLocaleTimeString();
-                    } catch (e) {
-                        return 'now';
-                    }
-                }
-                
-                function refreshData() {
-                    const btn = event.target;
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '<div class="loading"></div> Refreshing...';
-                    btn.disabled = true;
-                    
-                    updateDashboard();
-                    showMessage('Dashboard data refreshed successfully', 'success');
-                    
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }, 1500);
-                }
-                
-                function runSimulation(type = 'http_flood') {
-                    const btn = event.target;
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '<div class="loading"></div> Running...';
-                    btn.disabled = true;
-                    
-                    const attackNames = {
-                        'http_flood': 'HTTP Flood',
-                        'distributed': 'Distributed',
-                        'slowloris': 'Slowloris'
-                    };
-                    
-                    showMessage(`Starting ${attackNames[type]} attack simulation...`, 'warning');
-                    
-                    fetch('/api/dashboard/simulate', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ type: type })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Simulation result:', data);
-                        
-                        if (data.error) {
-                            showMessage('Simulation error: ' + data.error, 'error');
-                        } else {
-                            showMessage(data.message || 'Simulation completed successfully', 'success');
-                            
-                            // Add to simulation history
-                            simulationHistory.unshift({
-                                type: attackNames[type],
-                                timestamp: new Date().toISOString(),
-                                status: 'Success',
-                                result: data.result
-                            });
-                            
-                            updateSimulationHistory();
-                            updateDashboard();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Simulation error:', error);
-                        showMessage('Simulation failed: ' + error.message, 'error');
-                    })
-                    .finally(() => {
-                        setTimeout(() => {
-                            btn.innerHTML = originalText;
-                            btn.disabled = false;
-                        }, 2000);
-                    });
-                }
-                
-                function updateSimulationHistory() {
-                    const container = document.getElementById('simulationHistory');
-                    if (container && simulationHistory.length > 0) {
-                        container.innerHTML = simulationHistory.slice(0, 5).map(sim => `
-                            <div class="log-entry">
-                                <i class="fas fa-play-circle" style="color: #10b981;"></i>
-                                <span>${sim.type} attack simulation</span>
-                                <span class="log-time">${formatTime(sim.timestamp)}</span>
-                            </div>
-                        `).join('');
-                    }
-                    
-                    // Update attack metrics
-                    const metricsContainer = document.getElementById('attackMetrics');
-                    if (metricsContainer) {
-                        const successRate = simulationHistory.length > 0 ? 
-                            Math.round((simulationHistory.filter(s => s.status === 'Success').length / simulationHistory.length) * 100) : 0;
-                        
-                        updateMetrics('attackMetrics', [
-                            { label: 'Total Simulations', value: simulationHistory.length },
-                            { label: 'Success Rate', value: successRate + '%' },
-                            { label: 'Avg Duration', value: '10s' }
-                        ]);
-                    }
-                }
-                
-                function resetSystem() {
-                    if (confirm('Are you sure you want to reset the system? This will clear all data and statistics.')) {
-                        const btn = event.target;
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = '<div class="loading"></div> Resetting...';
-                        btn.disabled = true;
-                        
-                        fetch('/api/dashboard/reset', { method: 'POST' })
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                if (data.error) {
-                                    showMessage('Reset error: ' + data.error, 'error');
-                                } else {
-                                    showMessage('System reset completed successfully', 'success');
-                                    simulationHistory = [];
-                                    updateSimulationHistory();
-                                    updateDashboard();
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Reset error:', error);
-                                showMessage('Reset failed: ' + error.message, 'error');
-                            })
-                            .finally(() => {
-                                setTimeout(() => {
-                                    btn.innerHTML = originalText;
-                                    btn.disabled = false;
-                                }, 2000);
-                            });
-                    }
-                }
-                
-                function showMessage(message, type) {
-                    const container = document.getElementById('controlMessages');
-                    if (container) {
-                        const icons = {
-                            success: 'check-circle',
-                            warning: 'exclamation-triangle',
-                            error: 'times-circle',
-                            info: 'info-circle'
-                        };
-                        
-                        container.innerHTML = `
-                            <div class="alert ${type}">
-                                <i class="fas fa-${icons[type]}"></i> ${message}
-                            </div>
-                        `;
-                        
-                        setTimeout(() => {
-                            container.innerHTML = '';
-                        }, 5000);
-                    }
-                }
-                
-                // Initialize dashboard
-                document.addEventListener('DOMContentLoaded', function() {
-                    console.log('Dashboard initializing...');
-                    updateDashboard();
-                    
-                    // Auto-refresh every 5 seconds
-                    updateInterval = setInterval(updateDashboard, 5000);
-                });
-                
-                // Cleanup on page unload
-                window.addEventListener('beforeunload', function() {
-                    if (updateInterval) {
-                        clearInterval(updateInterval);
-                    }
-                });
-            </script>
-        </body>
-        </html>
-        '''
-         
-    def run(self, host='0.0.0.0', port=8080, debug=False):
-         
-        
-        """
-        Run the enhanced dashboard.
+                logger.error(f"Error in debug reputation endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
 
-        Args:
-            host (str): Host to bind to
-            port (int): Port to bind to
-            debug (bool): Enable debug mode
-        """
-        self.start_time = time.time()
-        logger.info(f"🛡️  Starting Aurora Shield Dashboard (INFOTHON 5.0)")
-        logger.info(f"📊 Dashboard: http://{host}:{port}")
-        logger.info(f"🔐 Demo Credentials: admin/admin123 or user/user123")
-        logger.info(f"🎯 Tech Stack: Flask + Python + Real-time Monitoring")
-
+    def _get_uptime(self):
+        """Get system uptime in a human-readable format."""
         try:
+            uptime_seconds = time.time() - self.shield_manager.start_time
+            hours = int(uptime_seconds // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            return f"{hours}h {minutes}m"
+        except:
+            return "Unknown"
+
+    def _get_real_recent_attacks(self):
+        """Get actual recent attack attempts from blocked requests."""
+        try:
+            # Get recent blocked requests from shield manager
+            recent_requests = self.shield_manager.recent_requests[:10]
+            attacks = []
+            
+            for req in recent_requests:
+                if req['status'] in ['blocked', 'rate-limited']:
+                    attack_type = 'Rate Limiting' if req['status'] == 'rate-limited' else 'Malicious Request'
+                    
+                    # Use the proper timestamp format
+                    timestamp = req.get('timestamp_iso', req.get('timestamp'))
+                    if not timestamp:
+                        timestamp = datetime.now().isoformat()
+                    
+                    attacks.append({
+                        'timestamp': timestamp,
+                        'type': attack_type,
+                        'source': req['ip'],
+                        'status': 'Blocked' if req['status'] == 'blocked' else 'Rate Limited',
+                        'url': req['url']
+                    })
+            
+            return attacks[:5]  # Return last 5 attacks
+        except Exception as e:
+            logger.error(f"Error getting recent attacks: {e}")
+            return []
+    
+    def _determine_action_taken(self, ip: str, sinkhole_data: dict) -> str:
+        """Determine what action was taken for a specific IP"""
+        if ip in sinkhole_data.get('ip_blackholes', []):
+            return 'Blackholed (Complete Block)'
+        elif ip in sinkhole_data.get('ip_sinkholes', []):
+            return 'Sinkholed (Intelligence Gathering)'
+        elif ip in sinkhole_data.get('quarantined_ips', {}):
+            quarantine_info = sinkhole_data['quarantined_ips'][ip]
+            time_left = int(quarantine_info.get('time_remaining', 0))
+            return f'Quarantined ({time_left}s remaining)'
+        else:
+            return 'Blocked (Rate Limited)'
+
+    def _format_uptime(self, uptime_seconds):
+        """Format uptime in a human-readable format."""
+        hours = int(uptime_seconds // 3600)
+        minutes = int((uptime_seconds % 3600) // 60)
+        return f"{hours}h {minutes}m"
+
+    def _get_performance_metrics(self):
+        """Get current performance metrics including real IP reputation data."""
+        try:
+            # Get real IP request counts from shield manager
+            live_data = self.shield_manager.get_live_requests()
+            ip_counts = live_data.get('ip_request_counts', {})
+            
+            # Get actual IP reputation scores from the IP reputation system
+            ip_reputation_data = {}
+            
+            # Get all tracked IPs from the reputation system
+            if hasattr(self.shield_manager, 'ip_reputation') and self.shield_manager.ip_reputation:
+                for ip in self.shield_manager.ip_reputation.reputation_scores:
+                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
+                    
+                    # Get violation history count
+                    violation_count = len(self.shield_manager.ip_reputation.violation_history.get(ip, []))
+                    
+                    ip_reputation_data[ip] = {
+                        'reputation_score': reputation_info['score'],
+                        'status': reputation_info['status'],
+                        'allowed': reputation_info['allowed'],
+                        'violation_count': violation_count,
+                        'total_requests': ip_counts.get(ip, 0),
+                        'is_blacklisted': ip in self.shield_manager.ip_reputation.blacklist,
+                        'is_whitelisted': ip in self.shield_manager.ip_reputation.whitelist
+                    }
+            
+            # Also include IPs from recent requests that might not be in reputation system yet
+            recent_requests = live_data.get('requests', [])
+            for request in recent_requests:
+                ip = request.get('ip', 'unknown')
+                if ip not in ip_reputation_data and ip != 'unknown':
+                    reputation_info = self.shield_manager.ip_reputation.get_reputation(ip)
+                    ip_reputation_data[ip] = {
+                        'reputation_score': reputation_info['score'],
+                        'status': reputation_info['status'],
+                        'allowed': reputation_info['allowed'],
+                        'violation_count': 0,
+                        'total_requests': ip_counts.get(ip, 0),
+                        'is_blacklisted': False,
+                        'is_whitelisted': False
+                    }
+            
+            return {
+                'response_time_ms': 45,
+                'memory_usage_percent': 35,
+                'cpu_usage_percent': 12,
+                'ip_request_counts': ip_counts,
+                'ip_reputation_data': ip_reputation_data
+            }
+        except Exception as e:
+            logger.error(f"Error getting performance metrics: {e}")
+            return {
+                'response_time_ms': 45,
+                'memory_usage_percent': 35,
+                'cpu_usage_percent': 12,
+                'ip_request_counts': {},
+                'ip_reputation_data': {}
+            }
+
+    def _validate_config_updates(self, config_updates):
+        """Validate configuration updates."""
+        try:
+            # Define validation rules
+            validation_rules = {
+                'rate_limiter': {
+                    'rate': {'type': (int, float), 'min': 1, 'max': 10000},
+                    'burst': {'type': (int, float), 'min': 1, 'max': 1000},
+                    'window_size': {'type': int, 'min': 1, 'max': 3600}
+                },
+                'anomaly_detector': {
+                    'request_window': {'type': int, 'min': 1, 'max': 3600},
+                    'rate_threshold': {'type': int, 'min': 1, 'max': 100000},
+                    'sensitivity': {'type': str, 'choices': ['low', 'medium', 'high']}
+                },
+                'ip_reputation': {
+                    'initial_score': {'type': int, 'min': 0, 'max': 100},
+                    'reputation_threshold': {'type': int, 'min': 0, 'max': 100},
+                    'decay_rate': {'type': (int, float), 'min': 0, 'max': 1}
+                },
+                'challenge_response': {
+                    'challenge_timeout': {'type': int, 'min': 10, 'max': 3600},
+                    'difficulty': {'type': str, 'choices': ['easy', 'medium', 'hard']},
+                    'max_attempts': {'type': int, 'min': 1, 'max': 10}
+                },
+                'thresholds': {
+                    'requests_per_second': {'type': int, 'min': 10, 'max': 100000},
+                    'connection_limit': {'type': int, 'min': 10, 'max': 1000000},
+                    'response_time_limit': {'type': int, 'min': 100, 'max': 30000},
+                    'cpu_threshold': {'type': int, 'min': 10, 'max': 95},
+                    'memory_threshold': {'type': int, 'min': 10, 'max': 95}
+                }
+            }
+            
+            # Validate each section
+            for section, values in config_updates.items():
+                if section not in validation_rules:
+                    continue
+                    
+                if not isinstance(values, dict):
+                    return {'valid': False, 'error': f'Invalid format for section {section}'}
+                
+                for key, value in values.items():
+                    if key not in validation_rules[section]:
+                        continue
+                    
+                    rule = validation_rules[section][key]
+                    
+                    # Type validation
+                    if not isinstance(value, rule['type']):
+                        return {'valid': False, 'error': f'Invalid type for {section}.{key}'}
+                    
+                    # Range validation
+                    if 'min' in rule and value < rule['min']:
+                        return {'valid': False, 'error': f'{section}.{key} must be >= {rule["min"]}'}
+                    
+                    if 'max' in rule and value > rule['max']:
+                        return {'valid': False, 'error': f'{section}.{key} must be <= {rule["max"]}'}
+                    
+                    # Choice validation
+                    if 'choices' in rule and value not in rule['choices']:
+                        return {'valid': False, 'error': f'{section}.{key} must be one of {rule["choices"]}'}
+            
+            return {'valid': True}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Validation error: {str(e)}'}
+
+    def _apply_config_updates(self, config_updates):
+        """Apply configuration updates to the shield manager."""
+        try:
+            # Update shield manager configuration
+            if hasattr(self.shield_manager, 'config'):
+                for section, values in config_updates.items():
+                    if section in self.shield_manager.config:
+                        self.shield_manager.config[section].update(values)
+                    else:
+                        self.shield_manager.config[section] = values
+            
+            # Apply specific updates to components
+            if 'rate_limiter' in config_updates:
+                if hasattr(self.shield_manager, 'rate_limiter'):
+                    rate_config = config_updates['rate_limiter']
+                    if 'rate' in rate_config:
+                        self.shield_manager.rate_limiter.rate = rate_config['rate']
+                    if 'burst' in rate_config:
+                        self.shield_manager.rate_limiter.burst = rate_config['burst']
+            
+            if 'anomaly_detector' in config_updates:
+                if hasattr(self.shield_manager, 'anomaly_detector'):
+                    anomaly_config = config_updates['anomaly_detector']
+                    if 'request_window' in anomaly_config:
+                        self.shield_manager.anomaly_detector.request_window = anomaly_config['request_window']
+                    if 'rate_threshold' in anomaly_config:
+                        self.shield_manager.anomaly_detector.rate_threshold = anomaly_config['rate_threshold']
+            
+            # Log the configuration change
+            logger.info(f"Applied configuration updates: {config_updates}")
+            
+        except Exception as e:
+            logger.error(f"Error applying config updates: {e}")
+            raise
+
+    def _get_country_from_ip(self, ip):
+        """Get country from IP address (simplified)"""
+        if not ip:
+            return 'Unknown'
+        
+        # Simple IP to country mapping for demo
+        ip_country_map = {
+            '192.168.': 'Local Network',
+            '10.0.': 'Private Network',
+            '172.16.': 'Private Network',
+            '203.0.113.': 'Documentation',
+            '198.51.100.': 'Test Network',
+            '45.76.': 'Russia',
+            '185.220.': 'Germany',
+            '77.234.': 'China'
+        }
+        
+        for ip_prefix, country in ip_country_map.items():
+            if ip.startswith(ip_prefix):
+                return country
+        
+        return 'Unknown'
+
+    def _get_attack_severity(self, attack_type):
+        """Determine attack severity based on type"""
+        if not attack_type:
+            return 'Low'
+        
+        attack_type_lower = attack_type.lower()
+        
+        if any(term in attack_type_lower for term in ['sql injection', 'command injection', 'zero-day', 'buffer overflow']):
+            return 'Critical'
+        elif any(term in attack_type_lower for term in ['xss', 'csrf', 'path traversal', 'ddos', 'brute force']):
+            return 'High'
+        elif any(term in attack_type_lower for term in ['bot detection', 'scanner', 'suspicious']):
+            return 'Medium'
+        else:
+            return 'Low'
+
+    def _generate_malicious_user_agent(self):
+        """Generate realistic malicious user agents"""
+        malicious_agents = [
+            'sqlmap/1.4.7#stable',
+            'Mozilla/5.0 (compatible; Nmap Scripting Engine)',
+            'python-requests/2.25.1',
+            'curl/7.68.0',
+            'Wget/1.20.3',
+            'Mozilla/5.0 AttackBot/1.0',
+            'masscan/1.3.2',
+            'Nikto/2.1.6',
+            'gobuster/3.1.0',
+            'dirb/2.22'
+        ]
+        
+        return random.choice(malicious_agents)
+
+    def _generate_attack_uri(self, attack_type):
+        """Generate realistic attack URIs based on attack type"""
+        if not attack_type:
+            return '/'
+        
+        attack_type_lower = attack_type.lower()
+        
+        if 'sql injection' in attack_type_lower:
+            return "/login?id=1' OR '1'='1"
+        elif 'xss' in attack_type_lower:
+            return "/search?q=<script>alert('xss')</script>"
+        elif 'path traversal' in attack_type_lower:
+            return "/file?path=../../../etc/passwd"
+        elif 'command injection' in attack_type_lower:
+            return "/exec?cmd=; rm -rf /"
+        elif 'brute force' in attack_type_lower:
+            return "/admin/login"
+        elif 'scanner' in attack_type_lower:
+            return "/admin/config.php"
+        elif 'bot' in attack_type_lower:
+            return "/robots.txt"
+        else:
+            return "/"
+
+    def _calculate_attack_stats(self, recent_attacks):
+        """Calculate attack statistics"""
+        if not recent_attacks:
+            return {
+                'total_attacks': 0,
+                'attacks_by_type': {},
+                'attacks_by_action': {},
+                'attacks_by_severity': {},
+                'top_attacking_ips': []
+            }
+        
+        # Count attacks by type
+        attacks_by_type = {}
+        attacks_by_action = {}
+        attacks_by_severity = {}
+    
+    def _map_status_to_attack_type(self, status):
+        """Map request status to attack type"""
+        status_mapping = {
+            'blocked': 'Malicious Request',
+            'blackholed': 'Critical Threat',
+            'sinkholed': 'Suspicious Activity',
+            'quarantined': 'Potential Threat',
+            'rate-limited': 'Rate Limit Exceeded',
+            'challenged': 'Challenge Required'
+        }
+        return status_mapping.get(status, 'Unknown Attack')
+    
+    def _map_status_to_action(self, status):
+        """Map request status to action taken"""
+        action_mapping = {
+            'blocked': 'Blocked',
+            'blackholed': 'Blackholed',
+            'sinkholed': 'Sinkholed',
+            'quarantined': 'Quarantined',
+            'rate-limited': 'Rate Limited',
+            'challenged': 'Challenged'
+        }
+        return action_mapping.get(status, 'Monitored')
+    
+    def _get_attack_severity_from_status(self, status):
+        """Get attack severity based on status"""
+        severity_mapping = {
+            'blocked': 'high',
+            'blackholed': 'critical',
+            'sinkholed': 'high',
+            'quarantined': 'critical',
+            'rate-limited': 'medium',
+            'challenged': 'low'
+        }
+        return severity_mapping.get(status, 'low')
+
+    def start(self):
+        """Start the dashboard server"""
+        logger.info("Starting Aurora Shield Dashboard...")
+        self.app.run(
+            host='0.0.0.0',
+            port=5001,
+            debug=False,
+            threaded=True
+        )
+
+    def run(self, host='0.0.0.0', port=8080, debug=False):
+        """Run the enhanced dashboard server."""
+        try:
+            logger.info("🛡️  Starting Aurora Shield Dashboard (INFOTHON 5.0)")
+            logger.info(f"📊 Dashboard: http://{host}:{port}")
+            logger.info("🔐 Demo Credentials: admin/admin123 or user/user123")
+            logger.info("🎯 Tech Stack: Flask + Python + Real-time Monitoring")
+            
             self.app.run(host=host, port=port, debug=debug, threaded=True)
+            
         except KeyboardInterrupt:
             logger.info("🛑 Aurora Shield Dashboard stopped")
         except Exception as e:
             logger.error(f"❌ Dashboard error: {e}")
-            

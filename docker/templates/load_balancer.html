@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Load Balancer Control Panel</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Roboto+Mono:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* Dark neon purple theme inspired by provided image */
+    :root{
+      --bg-0: #06101b; /* page background base */
+      --bg-1: linear-gradient(180deg,#071223 0%, #0b1020 40%, #081022 100%);
+      --panel: rgba(18,16,34,0.52);
+      --frost: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.04);
+      --accent-purple: #8B5CF6; /* vivid neon purple */
+      --accent-purple-80: rgba(139,92,246,0.18);
+      --accent-cyan: #66e0ff;
+      --muted: #9aa3b2;
+      --card-radius: 14px;
+    }
+
+    /* Reset & base */
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:'Inter', 'Roboto Mono', monospace, sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      background: var(--bg-1);
+      color:#dbeafe;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:2.5rem 1.25rem;
+    }
+
+    /* Top heading */
+    h1{
+      margin:0 0 0.4rem 0;
+      font-weight:900;
+      font-size:2.6rem;
+      letter-spacing:0.06em;
+      color:var(--accent-purple);
+      text-shadow:0 6px 30px rgba(139,92,246,0.08), 0 0 18px var(--accent-purple-80);
+      user-select:none;
+      text-align:center;
+    }
+    p.subtitle{
+      margin:0 0 2.6rem 0;
+      color:var(--muted);
+      font-weight:600;
+      text-align:center;
+    }
+
+    h2{color:#e6e2ff;margin:0 0 0.9rem 0}
+
+    /* Buttons */
+    .btn-container{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-bottom:2.6rem}
+    button{
+      border:1px solid transparent;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      color:#f8fafc;
+      padding:0.7rem 1.4rem;
+      font-weight:800;
+      font-size:1rem;
+      border-radius:10px;
+      cursor:pointer;
+      min-width:140px;
+      box-shadow:0 6px 30px rgba(11,9,26,0.6), 0 0 0 rgba(0,0,0,0);
+      transition:all .22s ease;
+    }
+    button:focus{outline:2px solid rgba(139,92,246,0.24);outline-offset:4px}
+    button.restart{background:linear-gradient(90deg,var(--accent-purple),#6f3fe6);color:white;border:1px solid rgba(139,92,246,0.18);box-shadow:0 6px 30px var(--accent-purple-80)}
+    button.restart:hover{transform:translateY(-3px);box-shadow:0 18px 64px var(--accent-purple-80)}
+    button.migrate{background:linear-gradient(90deg,var(--accent-cyan),#3ecfff);color:#02111a;border:1px solid rgba(102,224,255,0.12);box-shadow:0 8px 40px rgba(102,224,255,0.08)}
+
+    /* Card / list */
+    .ip-card{
+      width:100%;max-width:820px;padding:1.6rem 1.6rem;border-radius:var(--card-radius);
+      background:linear-gradient(180deg, rgba(14,11,28,0.62), rgba(8,7,16,0.48));
+      border:1px solid var(--glass-border);
+      box-shadow:0 8px 40px rgba(2,6,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+      color:#e6e6ff;font-weight:600;backdrop-filter:blur(8px);
+    }
+    table{width:100%;border-collapse:collapse;font-family:'Roboto Mono',monospace;color:var(--muted)}
+    td{padding:0.8rem 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;gap:0.85rem}
+    .status-dot{width:14px;height:14px;border-radius:50%;background:linear-gradient(180deg,#9b59ff,#6f3fe6);box-shadow:0 6px 24px rgba(139,92,246,0.18)}
+
+  /* Footer */
+  footer{margin-top:auto;padding:1rem;color:var(--muted);font-size:0.9rem}
+
+  /* Statistics, CDN cards and Actions */
+  .dashboard-main{width:100%;max-width:1200px;display:flex;flex-direction:column;align-items:center;gap:1.25rem}
+  .stats-row{width:100%;display:flex;justify-content:center}
+  .stats-card{display:flex;flex-direction:column;gap:0.45rem;padding:1.25rem 1.6rem;background:linear-gradient(180deg, rgba(34,28,54,0.55), rgba(20,18,38,0.45));border-radius:12px;border:1px solid rgba(139,92,246,0.06);box-shadow:0 12px 40px rgba(6,5,20,0.6);max-width:1100px;width:100%}
+  .stats-card h3{margin:0 0 0.6rem 0;color:var(--accent-purple);font-size:1.05rem}
+  .stats-card p{margin:0;color:#dbeafe;font-weight:700}
+  .stats-meta{display:flex;gap:1.5rem;flex-wrap:wrap}
+
+  .cdn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;width:100%;max-width:1100px}
+  .cdn-card{padding:1.15rem;background:linear-gradient(180deg, rgba(28,24,46,0.56), rgba(18,16,34,0.48));border-radius:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 36px rgba(2,6,23,0.55)}
+  .cdn-card{position:relative;padding-top:1.35rem}
+  .cdn-toggle{position:absolute;top:10px;right:12px;display:flex;align-items:center}
+  /* simple toggle switch */
+  .cdn-toggle input[type="checkbox"]{display:none}
+  .cdn-toggle .switch{width:46px;height:24px;background:rgba(255,255,255,0.06);border-radius:999px;position:relative;cursor:pointer;border:1px solid rgba(255,255,255,0.04)}
+  .cdn-toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:all .18s ease;box-shadow:0 4px 12px rgba(2,6,23,0.6)}
+  .cdn-toggle input[type="checkbox"]:checked + .switch{background:linear-gradient(90deg,var(--accent-cyan),#66e0ff)}
+  .cdn-toggle input[type="checkbox"]:checked + .switch .knob{transform:translateX(22px)}
+  .cdn-card.offline{opacity:0.55;filter:grayscale(0.06)}
+  .cdn-card h3{margin:0 0 0.6rem 0;color:var(--accent-cyan)}
+  .cdn-card p{margin:0.28rem 0;color:#e6e6ff;font-weight:700}
+  .cdn-card a{color:var(--muted);text-decoration:none}
+
+  .actions-card{width:100%;max-width:1100px;padding:1rem;background:transparent;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+  .action-buttons{display:flex;gap:0.6rem;flex-wrap:wrap}
+  .action-buttons .action-btn{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:0.55rem 0.9rem;border-radius:10px;font-weight:800;cursor:pointer}
+  .action-buttons .action-btn:hover{color:#fff;box-shadow:0 18px 64px var(--accent-purple-80);transform:translateY(-3px)}
+
+
+    /* Modal overlay */
+    .modal-overlay{position:fixed;inset:0;background:linear-gradient(180deg, rgba(3,6,12,0.6), rgba(3,6,12,0.85));backdrop-filter:blur(6px);display:none;justify-content:center;align-items:center;z-index:1000}
+    .modal-overlay.active{display:flex}
+
+    /* Modal dialog */
+    .modal{
+      --accent-color:var(--accent-purple);--accent-color-80:var(--accent-purple-80);
+      max-width:420px;width:92%;background:linear-gradient(180deg, rgba(8,6,18,0.88), rgba(10,8,20,0.95));border-radius:14px;padding:1.8rem;position:relative;color:#eff0ff;border:1px solid rgba(139,92,246,0.08);box-shadow:0 20px 80px rgba(6,5,20,0.72), 0 0 40px var(--accent-purple-80);
+    }
+    .modal h3{margin:0 0 1rem 0;font-weight:900;color:var(--accent-purple);text-shadow:0 0 18px var(--accent-purple-80)}
+    .modal label{display:block;color:var(--muted);font-weight:700;margin-bottom:0.45rem}
+    select{width:100%;padding:0.6rem;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(6,9,18,0.6);color:#e6eef8;font-weight:700;margin-bottom:1rem;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)}
+    select:focus{outline:none;box-shadow:0 6px 30px var(--accent-purple-80)}
+
+    .modal button{width:100%;padding:0.75rem;border-radius:10px;font-weight:800}
+    .modal button.confirm-restart{background:linear-gradient(90deg,var(--accent-purple),#6b3be8);color:#fff;border:1px solid rgba(139,92,246,0.14);box-shadow:0 18px 64px var(--accent-purple-80)}
+    .modal button.confirm-migrate{background:linear-gradient(90deg,var(--accent-cyan),#66e0ff);color:#02111a;border:1px solid rgba(102,224,255,0.12);box-shadow:0 12px 48px rgba(102,224,255,0.08)}
+
+    .modal .close-btn{position:absolute;top:12px;right:14px;background:transparent;border:none;color:var(--muted);font-weight:800;font-size:1.2rem}
+    .modal .close-btn:hover{color:var(--accent-purple)}
+
+    /* small screens */
+    @media (max-width:640px){
+      .ip-card{padding:1.1rem}
+      h1{font-size:1.9rem}
+      .btn-container{gap:0.5rem}
+      button{min-width:120px;padding:0.6rem 1rem}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Load Balancer Control Panel</h1>
+    <p class="subtitle">Monitor and manage your CDN nodes securely.</p>
+  </header>
+
+  <div class="btn-container" role="region" aria-label="Control buttons">
+    <button class="restart" id="openRestart" aria-haspopup="dialog" aria-controls="restartModal">
+      Restart CDN
+    </button>
+    <button class="migrate" id="openMigrate" aria-haspopup="dialog" aria-controls="migrateModal">
+      Migrate CDN
+    </button>
+  </div>
+
+  <div class="dashboard-main">
+    <!-- Statistics -->
+    <section class="stats-card" aria-label="Statistics">
+      <h3>Statistics</h3>
+      <div class="stats-meta">
+        <p>Uptime: <strong>0:13:44</strong></p>
+        <p>Total Requests: <strong>8</strong></p>
+        <p>Errors: <strong>0</strong></p>
+      </div>
+    </section>
+
+    <!-- CDN Nodes grid -->
+    <div class="cdn-grid">
+      <div class="cdn-card" aria-label="Primary CDN" data-cdn="primary">
+        <div class="cdn-toggle">
+          <input type="checkbox" id="toggle-primary" checked />
+          <label for="toggle-primary" class="switch"><span class="knob"></span></label>
+        </div>
+        <h3>Primary CDN</h3>
+        <p>Status: <strong class="cdn-status">Online</strong></p>
+        <p>Weight: <strong>3</strong></p>
+        <p>Requests: <strong class="cdn-requests">1</strong></p>
+      </div>
+
+      <div class="cdn-card" aria-label="Secondary CDN" data-cdn="secondary">
+        <div class="cdn-toggle">
+          <input type="checkbox" id="toggle-secondary" checked />
+          <label for="toggle-secondary" class="switch"><span class="knob"></span></label>
+        </div>
+        <h3>Secondary CDN</h3>
+        <p>Status: <strong class="cdn-status">Online</strong></p>
+        <p>Weight: <strong>2</strong></p>
+        <p>Requests: <strong class="cdn-requests">4</strong></p>
+      </div>
+
+      <div class="cdn-card" aria-label="Tertiary CDN" data-cdn="tertiary">
+        <div class="cdn-toggle">
+          <input type="checkbox" id="toggle-tertiary" checked />
+          <label for="toggle-tertiary" class="switch"><span class="knob"></span></label>
+        </div>
+        <h3>Tertiary CDN</h3>
+        <p>Status: <strong class="cdn-status">Online</strong></p>
+        <p>Weight: <strong>1</strong></p>
+        <p>Requests: <strong class="cdn-requests">3</strong></p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-card" aria-label="Actions">
+      <h3 style="color:var(--accent-purple);margin:0">Actions</h3>
+      <div class="action-buttons">
+        <button class="action-btn" id="testPrimary">Test Primary CDN</button>
+        <button class="action-btn" id="testSecondary">Test Secondary CDN</button>
+        <button class="action-btn" id="testTertiary">Test Tertiary CDN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restart Modal -->
+  <div class="modal-overlay" id="restartModal" role="dialog" aria-modal="true" aria-labelledby="restartTitle" tabindex="-1" aria-hidden="true">
+    <div class="modal" style="--accent-color:#00FF9D; --accent-color-80:#00FF9DCC">
+      <button class="close-btn" aria-label="Close Restart modal" id="closeRestart">&times;</button>
+      <h3 id="restartTitle">Restart CDN</h3>
+      <label for="restartSelect">Select CDN to restart:</label>
+      <select id="restartSelect" aria-describedby="restartDesc">
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+      <button class="confirm-restart" id="confirmRestart">Confirm Restart</button>
+    </div>
+  </div>
+
+  <!-- Migrate Modal -->
+  <div class="modal-overlay" id="migrateModal" role="dialog" aria-modal="true" aria-labelledby="migrateTitle" tabindex="-1" aria-hidden="true">
+    <div class="modal" style="--accent-color:#00E0FF; --accent-color-80:#00E0FFCC">
+      <button class="close-btn" aria-label="Close Migrate modal" id="closeMigrate">&times;</button>
+      <h3 id="migrateTitle">Migrate CDN</h3>
+      <label for="sourceSelect">Source CDN:</label>
+      <select id="sourceSelect">
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+
+      <label for="destinationSelect">Destination CDN:</label>
+      <select id="destinationSelect">
+        <option value="demo-webapp-cdn2">CDN-Secondary (Port 8081)</option>
+        <option value="demo-webapp">CDN-Primary (Port 80)</option>
+        <option value="demo-webapp-cdn3">CDN-Tertiary (Port 8082)</option>
+      </select>
+
+      <button class="confirm-migrate" id="confirmMigrate">Confirm Migration</button>
+    </div>
+  </div>
+
+
+  <script>
+    // Get modal elements and buttons
+    const restartModal = document.getElementById('restartModal');
+    const migrateModal = document.getElementById('migrateModal');
+    const openRestartBtn = document.getElementById('openRestart');
+    const openMigrateBtn = document.getElementById('openMigrate');
+    const closeRestartBtn = document.getElementById('closeRestart');
+    const closeMigrateBtn = document.getElementById('closeMigrate');
+
+    const confirmRestartBtn = document.getElementById('confirmRestart');
+    const confirmMigrateBtn = document.getElementById('confirmMigrate');
+    const restartSelect = document.getElementById('restartSelect');
+    const sourceSelect = document.getElementById('sourceSelect');
+    const destinationSelect = document.getElementById('destinationSelect');
+
+    // Open modals
+    openRestartBtn.addEventListener('click', () => {
+      restartModal.classList.add('active');
+      restartModal.setAttribute('aria-hidden', 'false');
+      restartModal.querySelector('select').focus();
+    });
+
+    openMigrateBtn.addEventListener('click', () => {
+      migrateModal.classList.add('active');
+      migrateModal.setAttribute('aria-hidden', 'false');
+      migrateModal.querySelector('select').focus();
+      updateDestinationOptions();
+    });
+
+    // Close modals
+    function closeRestart() {
+      restartModal.classList.remove('active');
+      restartModal.setAttribute('aria-hidden', 'true');
+      openRestartBtn.focus();
+    }
+    function closeMigrate() {
+      migrateModal.classList.remove('active');
+      migrateModal.setAttribute('aria-hidden', 'true');
+      openMigrateBtn.focus();
+    }
+    closeRestartBtn.addEventListener('click', closeRestart);
+    closeMigrateBtn.addEventListener('click', closeMigrate);
+
+    // Close modals if clicking outside modal content
+    restartModal.addEventListener('click', (e) => {
+      if (e.target === restartModal) closeRestart();
+    });
+    migrateModal.addEventListener('click', (e) => {
+      if (e.target === migrateModal) closeMigrate();
+    });
+
+    // Confirm buttons actions
+    confirmRestartBtn.addEventListener('click', async () => {
+      const selectedCDN = restartSelect.value;
+      confirmRestartBtn.textContent = 'Restarting...';
+      confirmRestartBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/cdn/restart', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ cdn: selectedCDN })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          alert(`✅ Restart successful for ${selectedCDN}\nTimestamp: ${result.timestamp || 'N/A'}`);
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (error) {
+        alert(`❌ Restart failed for ${selectedCDN}: ${error.message}`);
+      } finally {
+        confirmRestartBtn.textContent = 'Confirm Restart';
+        confirmRestartBtn.disabled = false;
+        closeRestart();
+      }
+    });
+
+    confirmMigrateBtn.addEventListener('click', async () => {
+      const sourceCDN = sourceSelect.value;
+      const destinationCDN = destinationSelect.value;
+      confirmMigrateBtn.textContent = 'Migrating...';
+      confirmMigrateBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/cdn/migrate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            source: sourceCDN, 
+            destination: destinationCDN 
+          })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          alert(`✅ Migration successful from ${sourceCDN} to ${destinationCDN}\nTimestamp: ${result.timestamp || 'N/A'}`);
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (error) {
+        alert(`❌ Migration failed: ${error.message}`);
+      } finally {
+        confirmMigrateBtn.textContent = 'Confirm Migration';
+        confirmMigrateBtn.disabled = false;
+        closeMigrate();
+      }
+    });
+
+    // Update destination options dynamically to disallow same source and destination
+    function updateDestinationOptions() {
+      const sourceVal = sourceSelect.value;
+      const options = Array.from(destinationSelect.options);
+      options.forEach(opt => {
+        opt.disabled = (opt.value === sourceVal);
+      });
+      // If currently selected destination matches source, change destination select value to first enabled option
+      if (destinationSelect.value === sourceVal) {
+        const firstEnabled = options.find(opt => !opt.disabled);
+        if (firstEnabled) destinationSelect.value = firstEnabled.value;
+      }
+    }
+    sourceSelect.addEventListener('change', updateDestinationOptions);
+
+    // Initialize on page load
+    updateDestinationOptions();
+
+    // Actions buttons handlers (simple demo behavior)
+    const testPrimary = document.getElementById('testPrimary');
+    const testSecondary = document.getElementById('testSecondary');
+    const testTertiary = document.getElementById('testTertiary');
+    testPrimary && testPrimary.addEventListener('click', async () => {
+      // Open primary CDN in a new tab
+      openCdnIfOnline('primary');
+    });
+    testSecondary && testSecondary.addEventListener('click', async () => {
+      // Open secondary CDN in a new tab
+      openCdnIfOnline('secondary');
+    });
+    testTertiary && testTertiary.addEventListener('click', async () => {
+      // Open tertiary CDN in a new tab
+      openCdnIfOnline('tertiary');
+    });
+
+    // CDN routing state
+    const cdnState = {
+      primary: { online: true, url: 'http://localhost:80' },
+      secondary: { online: true, url: 'http://localhost:8081' },
+      tertiary: { online: true, url: 'http://localhost:8082' }
+    };
+
+    // Wire toggle inputs
+    function setCdnUIState(name, online){
+      const card = document.querySelector(`.cdn-card[data-cdn="${name}"]`);
+      if(!card) return;
+      const statusEl = card.querySelector('.cdn-status');
+      if(online){
+        card.classList.remove('offline');
+        statusEl.textContent = 'Online';
+      } else {
+        card.classList.add('offline');
+        statusEl.textContent = 'Offline';
+      }
+    }
+
+    ['primary','secondary','tertiary'].forEach(name => {
+      const input = document.getElementById(`toggle-${name}`);
+      if(!input) return;
+      
+      input.addEventListener('change', async (e) => {
+        const isEnabled = e.target.checked;
+        
+        // Disable the toggle while processing
+        input.disabled = true;
+        
+        try {
+          // Map CDN names to service names for API call
+          const serviceNameMap = {
+            'primary': 'demo-webapp',
+            'secondary': 'demo-webapp-cdn2', 
+            'tertiary': 'demo-webapp-cdn3'
+          };
+          
+          const serviceName = serviceNameMap[name];
+          
+          // Call backend API to toggle CDN
+          const response = await fetch('/api/cdn/toggle', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              cdn: serviceName,
+              enabled: isEnabled 
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok) {
+            // Update local state
+            cdnState[name].online = isEnabled;
+            setCdnUIState(name, isEnabled);
+            
+            // Show success message
+            console.log(`✅ ${name} CDN ${isEnabled ? 'enabled' : 'disabled'} successfully`);
+            
+            // Refresh the page statistics after a short delay
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+            
+          } else {
+            throw new Error(result.error || 'Toggle operation failed');
+          }
+          
+        } catch (error) {
+          console.error(`❌ Failed to toggle ${name} CDN:`, error.message);
+          
+          // Revert toggle state on error
+          input.checked = !isEnabled;
+          cdnState[name].online = !isEnabled;
+          setCdnUIState(name, !isEnabled);
+          
+          alert(`❌ Failed to ${isEnabled ? 'enable' : 'disable'} ${name} CDN: ${error.message}`);
+        } finally {
+          // Re-enable the toggle
+          input.disabled = false;
+        }
+      });
+      
+      // Initialize UI state from current backend state
+      fetchCdnStatus().then(status => {
+        if (status && status.cdn_status && status.cdn_status[name]) {
+          const enabled = status.cdn_status[name].enabled;
+          input.checked = enabled;
+          cdnState[name].online = enabled;
+          setCdnUIState(name, enabled);
+        }
+      });
+    });
+
+    // Fetch current CDN status from backend
+    async function fetchCdnStatus() {
+      try {
+        const response = await fetch('/api/cdn/status');
+        const result = await response.json();
+        
+        if (response.ok) {
+          return result;
+        } else {
+          console.error('Failed to fetch CDN status:', result.error);
+          return null;
+        }
+      } catch (error) {
+        console.error('Error fetching CDN status:', error);
+        return null;
+      }
+    }
+
+    // Open CDN if online, otherwise show alert
+    function openCdnIfOnline(name){
+      const info = cdnState[name];
+      if(!info) return alert('Unknown CDN');
+      if(info.online){
+        window.open(info.url, '_blank', 'noopener');
+      } else {
+        alert(`${name.charAt(0).toUpperCase()+name.slice(1)} CDN is offline`);
+      }
+    }
+
+    // Auto-refresh CDN status every 10 seconds
+    setInterval(async () => {
+      const status = await fetchCdnStatus();
+      if (status && status.cdn_status) {
+        Object.keys(status.cdn_status).forEach(cdnKey => {
+          const cdnInfo = status.cdn_status[cdnKey];
+          const input = document.getElementById(`toggle-${cdnKey}`);
+          
+          // Update toggle state if it differs from backend
+          if (input && input.checked !== cdnInfo.enabled) {
+            input.checked = cdnInfo.enabled;
+            cdnState[cdnKey].online = cdnInfo.enabled;
+            setCdnUIState(cdnKey, cdnInfo.enabled);
+          }
+        });
+      }
+    }, 10000); // Refresh every 10 seconds
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'aurora-shield'
+    static_configs:
+      - targets: ['aurora-shield:8080']
+    
+  - job_name: 'attack-simulators'
+    static_configs:
+      - targets: ['attack-sim-1:5001', 'attack-sim-2:5002', 'attack-sim-3:5003']

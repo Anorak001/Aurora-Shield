@@ -1,0 +1,118 @@
+services:
+  # Aurora Shield Main Application with Sinkhole/Blackhole
+  aurora-shield:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: as_aurora-shield
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=service_dashboard.py
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Enhanced Attack Orchestrator with Virtual IP Management
+  attack-orchestrator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.orchestrator
+    container_name: as_attack-orchestrator
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      - AURORA_SHIELD_HOST=aurora-shield
+      - AURORA_SHIELD_PORT=8080
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    depends_on:
+      - aurora-shield
+    restart: unless-stopped
+
+  # Load Balancer (simplified)
+  load-balancer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.loadbalancer
+    container_name: as_load-balancer
+    ports:
+      - "8090:8090"
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    depends_on:
+      - demo-webapp
+      - demo-webapp-cdn2
+      - demo-webapp-cdn3
+    restart: unless-stopped
+
+  # Single Demo Web Application
+  demo-webapp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp
+    ports:
+      - "80:80"
+    environment:
+      - FLASK_ENV=production
+      - CDN_NAME=Primary CDN
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Demo Web Application CDN 2
+  demo-webapp-cdn2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp-cdn2
+    ports:
+      - "8081:80"
+    environment:
+      - FLASK_ENV=production
+      - CDN_NAME=Secondary CDN
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+  # Demo Web Application CDN 3
+  demo-webapp-cdn3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.webapp
+    container_name: as_demo-webapp-cdn3
+    ports:
+      - "8082:80"
+    environment:
+      - FLASK_ENV=production
+      - CDN_NAME=Tertiary CDN
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aurora-net
+    restart: unless-stopped
+
+volumes:
+  logs_data:
+
+networks:
+  aurora-net:
+    driver: bridge

@@ -1,0 +1,48 @@
+# Load Balancer Service
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies including Docker CLI and docker-compose
+RUN apt-get update && apt-get install -y \
+    curl \
+    docker.io \
+    docker-compose \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies including Docker SDK
+RUN pip install flask requests gunicorn docker
+
+# Create non-root user and add to docker group for Docker socket access
+RUN useradd -m -u 1000 loadbalancer && \
+    usermod -aG docker loadbalancer
+
+# Copy load balancer application
+COPY docker/load_balancer_app.py /app/app.py
+
+# Create templates directory and copy template files
+RUN mkdir -p /app/templates
+COPY docker/templates/load_balancer.html /app/templates/load_balancer.html
+COPY docker/templates/load_balancer_enhanced.html /app/templates/load_balancer_enhanced.html
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Set ownership of everything to loadbalancer user
+RUN chown -R loadbalancer:loadbalancer /app
+USER loadbalancer
+
+# Set environment variables
+ENV FLASK_ENV=production
+ENV PYTHONPATH=/app
+ENV PORT=8090
+
+# Expose port (Render will override with PORT env var)
+EXPOSE 8090
+
+# Health check - uses PORT env var
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8090}/health || exit 1
+
+# Start the load balancer
+CMD ["python", "app.py"]

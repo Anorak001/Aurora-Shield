@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Shield - Attack Simulator</title>
+    <style>
+        /* Reset & base */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html,body { height: 100%; }
+
+        /* Aurora Shield dark theme colors */
+        :root{
+            --bg-900: #0b1220; /* page background */
+            --bg-800: #0f1726; /* card outer */
+            --bg-700: #121627; /* card inner */
+            --panel: linear-gradient(180deg, rgba(16,20,35,0.85), rgba(12,14,24,0.7));
+            --accent: #9b7cff; /* soft purple */
+            --accent-2: #7ee0f6; /* teal highlight */
+            --muted: #98a0b3;
+            --glass: rgba(255,255,255,0.03);
+            --card-glow: rgba(123, 87, 232, 0.12);
+        }
+
+        body{
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(1000px 400px at 10% 10%, rgba(123,87,232,0.06), transparent 10%),
+                        radial-gradient(800px 300px at 90% 90%, rgba(53,60,188,0.04), transparent 12%),
+                        var(--bg-900);
+            color: #dbe6ff;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            min-height:100vh;
+            padding: 32px 24px;
+        }
+
+        .container{ max-width:1200px; margin:0 auto; }
+
+        /* Header */
+        .header{ text-align:left; margin-bottom:28px; }
+        .header h1{ font-size:28px; color:var(--accent); letter-spacing:0.4px; }
+        .header p{ color:var(--muted); margin-top:6px; }
+
+        /* Panel styles (cards) */
+        .status-panel,
+        .attack-panel,
+        .controls-panel,
+        .target-info{
+            background: linear-gradient(180deg, rgba(20,24,40,0.6), rgba(10,12,20,0.55));
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius:14px;
+            padding:18px;
+            margin-bottom:20px;
+            box-shadow: 0 6px 30px rgba(3,6,20,0.6), 0 0 40px var(--card-glow) inset;
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        /* Small accent stripe on panels */
+        .status-panel::before,
+        .attack-panel::before{
+            content: '';
+            height:4px; display:block; width:100%;
+            background: linear-gradient(90deg, rgba(155,124,255,0.9), rgba(126,224,246,0.6));
+            border-radius: 12px 12px 0 0; margin-bottom:12px; box-shadow: 0 6px 18px rgba(124,79,255,0.08) inset;
+        }
+
+        .stats-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:8px; }
+
+        .stat-card{
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius:12px; padding:16px; text-align:center;
+            position:relative; overflow:hidden; border:1px solid rgba(255,255,255,0.03);
+            box-shadow: 0 8px 24px rgba(2,6,20,0.6);
+        }
+
+        .stat-card::after{
+            content:''; position:absolute; right:-40%; top:-40%; width:260px; height:260px; border-radius:50%;
+            background: radial-gradient(circle at 30% 30%, rgba(155,124,255,0.06), transparent 35%);
+            transform: rotate(15deg);
+        }
+
+        .stat-value{ font-size:22px; font-weight:700; color:var(--accent); margin-bottom:6px; }
+        .stat-label{ color:var(--muted); font-size:12px; }
+
+        .attack-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+
+        .attack-card{
+            background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+            border-radius:12px; padding:18px; border:1px solid rgba(255,255,255,0.03);
+            transition: transform .18s ease, box-shadow .18s ease; position:relative; overflow:hidden;
+        }
+
+        .attack-card:hover{ transform: translateY(-6px); box-shadow: 0 18px 50px rgba(3,6,30,0.6), 0 0 40px rgba(123,87,232,0.06); }
+
+        /* attack type accents */
+        .attack-card.http-flood{ box-shadow: 0 10px 40px rgba(220,53,69,0.04) inset; }
+        .attack-card.slowloris{ box-shadow: 0 10px 40px rgba(255,193,7,0.03) inset; }
+        .attack-card.normal{ box-shadow: 0 10px 40px rgba(40,167,69,0.03) inset; }
+
+        .attack-title{ font-size:16px; font-weight:700; color:#e6e9ff; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+        .attack-icon{ font-size:18px; }
+
+        .form-group{ margin-bottom:14px; }
+        .form-group label{ display:block; margin-bottom:6px; color:var(--muted); font-size:13px; }
+
+        .form-group input,
+        .form-group select{
+            width:100%; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,0.02);
+            border:1px solid rgba(255,255,255,0.04); color: #dbe6ff; font-size:13px;
+        }
+
+        .btn{ padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:600; border:none; letter-spacing:0.6px; }
+
+        .btn-primary{ background: linear-gradient(90deg,var(--accent), #6b9cff); color:#07102a; }
+        .btn-primary:hover{ filter:brightness(1.05); }
+
+        .btn-danger{ background: linear-gradient(90deg,#ff758c,#dc3545); color:white; }
+        .btn-danger:hover{ filter:brightness(0.98); }
+
+        .btn-success{ background: linear-gradient(90deg,#2ecc71,#28a745); color:white; }
+
+        .controls-panel{ display:flex; gap:12px; align-items:center; justify-content:flex-start; flex-wrap:wrap; }
+
+        .active-attacks{ background: linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); border-radius:8px; padding:10px; color:var(--muted); }
+
+        .target-info{ display:flex; gap:24px; align-items:center; }
+        .target-info h3{ color:var(--accent); margin-bottom:0; }
+        .target-url{ font-family: monospace; background: rgba(255,255,255,0.02); padding:6px 10px; border-radius:8px; color:#dbe6ff; }
+
+        /* attacking pulse - subtle purple glow */
+        @keyframes pulse { 0%{ box-shadow: none } 50%{ box-shadow: 0 0 24px rgba(155,124,255,0.08) } 100%{ box-shadow:none } }
+        .attacking{ animation: pulse 2s infinite; }
+
+        .status-indicator{ display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; }
+        .status-active{ background: var(--accent); box-shadow: 0 0 12px rgba(155,124,255,0.22); }
+        .status-inactive{ background: rgba(255,255,255,0.06); }
+
+        /* Responsive tweaks */
+        @media (max-width:720px){ .attack-grid{ grid-template-columns: 1fr; } .stats-grid{ grid-template-columns: repeat(2,1fr); } .target-info{flex-direction:column; align-items:flex-start;} }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Aurora Shield Attack Simulator</h1>
+            <p>Configure and launch various attack patterns to test Aurora Shield's protection capabilities</p>
+        </div>
+        
+        <div class="target-info">
+            <h3>🎯 Target Information</h3>
+            <div><strong>Aurora Shield:</strong> <span class="target-url" id="aurora-url">Loading...</span></div>
+            <div><strong>Load Balancer:</strong> <span class="target-url" id="lb-url">Loading...</span></div>
+        </div>
+        
+        <div class="status-panel">
+            <h2>📊 Attack Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-requests">0</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="successful-requests">0</div>
+                    <div class="stat-label">Successful</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="blocked-requests">0</div>
+                    <div class="stat-label">Blocked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="failed-requests">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="request-rate">0</div>
+                    <div class="stat-label">Req/sec</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="active-attacks">0</div>
+                    <div class="stat-label">Active Attacks</div>
+                </div>
+            </div>
+            <div class="active-attacks" id="active-attacks-info" style="display: none;">
+                <strong>Active Attack Types:</strong> <span id="attack-types"></span>
+            </div>
+        </div>
+        
+        <div class="attack-panel">
+            <h2>⚔️ Attack Configurations</h2>
+            <div class="attack-grid">
+                <!-- HTTP Flood Attack -->
+                <div class="attack-card http-flood">
+                    <div class="attack-title">
+                        <span class="attack-icon">🚨</span>
+                        HTTP Flood Attack
+                    </div>
+                    <p>High-volume HTTP requests to overwhelm the target server</p>
+                    
+                    <div class="form-group">
+                        <label for="flood-rate">Requests per Second:</label>
+                        <input type="number" id="flood-rate" value="50" min="1" max="1000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="flood-duration">Duration (seconds):</label>
+                        <input type="number" id="flood-duration" value="30" min="5" max="300">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="flood-target">Target:</label>
+                        <select id="flood-target">
+                            <option value="aurora">Aurora Shield (Direct)</option>
+                            <option value="lb">Load Balancer (Intercepted)</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-danger" onclick="startAttack('http_flood')">
+                        Launch HTTP Flood
+                    </button>
+                </div>
+                
+                <!-- Slowloris Attack -->
+                <div class="attack-card slowloris">
+                    <div class="attack-title">
+                        <span class="attack-icon">🐌</span>
+                        Slowloris Attack
+                    </div>
+                    <p>Slow connection exhaustion attack to tie up server resources</p>
+                    
+                    <div class="form-group">
+                        <label for="slow-connections">Concurrent Connections:</label>
+                        <input type="number" id="slow-connections" value="20" min="1" max="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="slow-duration">Duration (seconds):</label>
+                        <input type="number" id="slow-duration" value="60" min="10" max="300">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="slow-target">Target:</label>
+                        <select id="slow-target">
+                            <option value="aurora">Aurora Shield (Direct)</option>
+                            <option value="lb">Load Balancer (Intercepted)</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-danger" onclick="startAttack('slowloris')">
+                        Launch Slowloris
+                    </button>
+                </div>
+                
+                <!-- Normal Traffic -->
+                <div class="attack-card normal">
+                    <div class="attack-title">
+                        <span class="attack-icon">🌐</span>
+                        Normal Traffic
+                    </div>
+                    <p>Simulate legitimate user traffic for baseline testing</p>
+                    
+                    <div class="form-group">
+                        <label for="normal-rate">Requests per Second:</label>
+                        <input type="number" id="normal-rate" value="2" min="1" max="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="normal-duration">Duration (seconds):</label>
+                        <input type="number" id="normal-duration" value="120" min="30" max="600">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="normal-target">Target:</label>
+                        <select id="normal-target">
+                            <option value="aurora">Aurora Shield (Direct)</option>
+                            <option value="lb">Load Balancer (Intercepted)</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-success" onclick="startAttack('normal')">
+                        Start Normal Traffic
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls-panel">
+            <h2>🎮 Global Controls</h2>
+            <button class="btn btn-danger" onclick="stopAllAttacks()">
+                🛑 Stop All Attacks
+            </button>
+            <button class="btn btn-primary" onclick="resetStats()">
+                🔄 Reset Statistics
+            </button>
+            <button class="btn btn-primary" onclick="refreshStatus()">
+                📊 Refresh Status
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        let statusInterval;
+        
+        // Start status updates
+        window.onload = function() {
+            refreshStatus();
+            statusInterval = setInterval(refreshStatus, 2000);
+        };
+        
+        function refreshStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStats(data.statistics);
+                    updateActiveAttacks(data.active_attacks, data.attack_types);
+                    updateTargetUrls(data.aurora_url, data.lb_url);
+                })
+                .catch(error => console.error('Error fetching status:', error));
+        }
+        
+        function updateStats(stats) {
+            document.getElementById('total-requests').textContent = stats.total_requests || 0;
+            document.getElementById('successful-requests').textContent = stats.successful_requests || 0;
+            document.getElementById('blocked-requests').textContent = stats.blocked_requests || 0;
+            document.getElementById('failed-requests').textContent = stats.failed_requests || 0;
+            document.getElementById('request-rate').textContent = (stats.request_rate || 0).toFixed(1);
+        }
+        
+        function updateActiveAttacks(count, types) {
+            document.getElementById('active-attacks').textContent = count;
+            
+            const indicator = document.querySelector('.status-indicator') || createStatusIndicator();
+            indicator.className = `status-indicator ${count > 0 ? 'status-active' : 'status-inactive'}`;
+            
+            const activeInfo = document.getElementById('active-attacks-info');
+            if (count > 0) {
+                document.getElementById('attack-types').textContent = types.join(', ');
+                activeInfo.style.display = 'block';
+                document.body.classList.add('attacking');
+            } else {
+                activeInfo.style.display = 'none';
+                document.body.classList.remove('attacking');
+            }
+        }
+        
+        function updateTargetUrls(auroraUrl, lbUrl) {
+            document.getElementById('aurora-url').textContent = auroraUrl;
+            document.getElementById('lb-url').textContent = lbUrl;
+        }
+        
+        function createStatusIndicator() {
+            const indicator = document.createElement('span');
+            indicator.className = 'status-indicator status-inactive';
+            document.querySelector('.stat-label').appendChild(indicator);
+            return indicator;
+        }
+        
+        function startAttack(type) {
+            let config = {};
+            
+            if (type === 'http_flood') {
+                config = {
+                    rate: parseInt(document.getElementById('flood-rate').value),
+                    duration: parseInt(document.getElementById('flood-duration').value),
+                    target: document.getElementById('flood-target').value
+                };
+            } else if (type === 'slowloris') {
+                config = {
+                    connections: parseInt(document.getElementById('slow-connections').value),
+                    duration: parseInt(document.getElementById('slow-duration').value),
+                    target: document.getElementById('slow-target').value
+                };
+            } else if (type === 'normal') {
+                config = {
+                    rate: parseInt(document.getElementById('normal-rate').value),
+                    duration: parseInt(document.getElementById('normal-duration').value),
+                    target: document.getElementById('normal-target').value
+                };
+            }
+            
+            fetch('/api/start_attack', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: type, config: config})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                } else {
+                    alert(`❌ Error: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error starting attack:', error);
+                alert('❌ Failed to start attack');
+            });
+        }
+        
+        function stopAllAttacks() {
+            fetch('/api/stop_all', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error stopping attacks:', error);
+                    alert('❌ Failed to stop attacks');
+                });
+        }
+        
+        function resetStats() {
+            fetch('/api/reset_stats', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✅ Statistics reset successfully');
+                        refreshStatus();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error resetting stats:', error);
+                    alert('❌ Failed to reset statistics');
+                });
+        }
+    </script>
+</body>
+</html>
