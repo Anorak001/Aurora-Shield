@@ -1,0 +1,72 @@
+# Render Blueprint - Aurora Shield
+# https://render.com/docs/blueprint-spec
+# This file enables automatic deployment on Render.com
+
+services:
+  # Aurora Shield Main Service (Production)
+  - type: web
+    name: aurora-shield
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: service_dashboard.py
+      - key: PORT
+        value: 8080
+
+  # Aurora Shield Staging (from finale branch)
+  - type: web
+    name: aurora-shield-staging
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: finale
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: staging
+      - key: FLASK_APP
+        value: service_dashboard.py
+      - key: PORT
+        value: 8080
+
+  # Attack Orchestrator Service
+  - type: web
+    name: aurora-orchestrator
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.orchestrator
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
+
+  # Load Balancer Service
+  - type: web
+    name: aurora-loadbalancer
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: main
+    dockerfilePath: ./docker/Dockerfile.loadbalancer
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 8090
